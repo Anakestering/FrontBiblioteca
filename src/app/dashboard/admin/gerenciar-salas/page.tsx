@@ -3,34 +3,33 @@
 import { useEffect, useState } from 'react';
 import { salas as salasApi } from '@/lib/api';
 import { Sala, SalaDTO } from '@/types';
+import { Modal } from '@/app/components/ui/Modal';
+import { Alert } from '@/app/components/ui/ErrorAlert';
+import { ActiveBadge } from '@/app/components/ui/ActiveBadge';
+import { EmptyState } from '@/app/components/ui/EmptyState';
+import { LoadingList } from '@/app/components/ui/LoadingList';
+import { SaveButton } from '@/app/components/ui/SaveButton';
+import { SearchInput } from '@/app/components/ui/SearchInput';
+import { PageHeader } from '@/app/components/ui/PageHeader';
+import { useConfirm } from '@/app/hooks/useConfirm';
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-[#161b22] rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)]">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
-  );
-}
 
 export default function GerenciarSalasPage() {
   const [list, setList] = useState<Sala[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [modal, setModal] = useState<'criar' | Sala | null>(null);
+
+  type ModalState =
+    | { tipo: 'criar' }
+    | { tipo: 'editar'; sala: Sala }
+    | null;
+
+  const [modal, setModal] = useState<ModalState>(null);
+
   const [form, setForm] = useState<SalaDTO>({ nome: '', capacidadePessoas: 5 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { openConfirm, confirmModal } = useConfirm();
 
   const loadList = async () => {
     setLoading(true);
@@ -45,21 +44,21 @@ export default function GerenciarSalasPage() {
   const openCriar = () => {
     setForm({ nome: '', capacidadePessoas: 5 });
     setError('');
-    setModal('criar');
+    setModal({ tipo: 'criar' });
   };
 
   const openEditar = (sala: Sala) => {
     setForm({ nome: sala.nome, capacidadePessoas: sala.capacidadePessoas });
     setError('');
-    setModal(sala);
+    setModal({ tipo: 'editar', sala });
   };
 
   const handleSave = async () => {
     setError('');
     setSaving(true);
     try {
-      if (modal === 'criar') await salasApi.criar(form);
-      else await salasApi.atualizar((modal as Sala).id, form);
+      if (modal?.tipo === 'criar') await salasApi.criar(form);
+      else if (modal?.tipo === 'editar') await salasApi.atualizar(modal.sala.id, form);
       await loadList();
       setModal(null);
     } catch (e: unknown) {
@@ -68,24 +67,33 @@ export default function GerenciarSalasPage() {
     setSaving(false);
   };
 
-  const handleToggle = async (sala: Sala) => {
-    try {
-      if (sala.ativo) await salasApi.desativar(sala.id);
-      else await salasApi.ativar(sala.id);
-      await loadList();
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Erro');
-    }
+  const handleToggle = (sala: Sala) => {
+    openConfirm({
+      title: sala.ativo ? 'Desativar sala' : 'Ativar sala',
+      message: sala.ativo
+        ? `Desativar "${sala.nome}"? Ela não aparecerá para reservas.`
+        : `Ativar "${sala.nome}"?`,
+      confirmLabel: sala.ativo ? 'Desativar' : 'Ativar',
+      confirmStyle: sala.ativo ? 'warning' : 'success',
+      onConfirm: async () => {
+        if (sala.ativo) await salasApi.desativar(sala.id);
+        else await salasApi.ativar(sala.id);
+        await loadList();
+      },
+    });
   };
 
-  const handleDeletar = async (sala: Sala) => {
-    if (!confirm(`Excluir permanentemente a sala "${sala.nome}"? Esta ação não pode ser desfeita.`)) return;
-    try {
-      await salasApi.deletar(sala.id);
-      await loadList();
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Erro');
-    }
+  const handleDeletar = (sala: Sala) => {
+    openConfirm({
+      title: 'Excluir sala',
+      message: `Excluir permanentemente "${sala.nome}"? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      confirmStyle: 'danger',
+      onConfirm: async () => {
+        await salasApi.deletar(sala.id);
+        await loadList();
+      },
+    });
   };
 
   const filtered = list.filter(s =>
@@ -97,45 +105,26 @@ export default function GerenciarSalasPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">Gerenciar Salas</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            {ativas.length} ativa{ativas.length !== 1 ? 's' : ''} · {inativas.length} inativa{inativas.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <button onClick={openCriar} className="btn-primary flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Nova Sala
-        </button>
-      </div>
-
-      <input
-        type="text"
-        placeholder="Buscar por nome..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        className="input-field max-w-sm"
+      <PageHeader
+        title="Gerenciar Salas"
+        subtitle={`${ativas.length} ativa${ativas.length !== 1 ? 's' : ''} · ${inativas.length} inativa${inativas.length !== 1 ? 's' : ''}`}
+        buttonLabel="Nova Sala"
+        onButtonClick={openCriar}
       />
 
+      <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome..." />
+
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl shimmer" />)}
-        </div>
+        <LoadingList />
       ) : filtered.length === 0 ? (
-        <div className="card p-12 text-center">
-          <p className="text-[var(--text-secondary)]">Nenhuma sala encontrada</p>
-        </div>
+        <EmptyState message="Nenhuma sala encontrada" />
       ) : (
         <div className="card divide-y divide-[var(--border)]">
           {[...ativas, ...inativas].map(sala => (
             <div
               key={sala.id}
-              className={`flex items-center justify-between px-5 py-4 gap-3 transition-opacity ${
-                !sala.ativo ? 'opacity-50' : ''
-              }`}
+              className={`flex items-center justify-between px-5 py-4 gap-3 transition-opacity ${!sala.ativo ? 'opacity-50' : ''
+                }`}
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
@@ -145,39 +134,15 @@ export default function GerenciarSalasPage() {
                   <p className="font-medium text-[var(--text-primary)]">{sala.nome}</p>
                   <p className="text-xs text-[var(--text-muted)]">
                     Cap. {sala.capacidadePessoas} pessoas ·{' '}
-                    <span className={sala.ativo
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-rose-500 dark:text-rose-400'
-                    }>
-                      {sala.ativo ? 'Ativa' : 'Inativa'}
-                    </span>
+                    <ActiveBadge ativo={sala.ativo} genero="feminino" />
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-1">
-                <button
-                  onClick={() => openEditar(sala)}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline underline-offset-2 px-2 py-1"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleToggle(sala)}
-                  className={`text-sm hover:underline underline-offset-2 px-2 py-1 ${
-                    sala.ativo
-                      ? 'text-amber-500 dark:text-amber-400'
-                      : 'text-green-600 dark:text-green-400'
-                  }`}
-                >
-                  {sala.ativo ? 'Desativar' : 'Ativar'}
-                </button>
-                <button
-                  onClick={() => handleDeletar(sala)}
-                  className="text-sm text-rose-500 dark:text-rose-400 hover:underline underline-offset-2 px-2 py-1"
-                >
-                  Excluir
-                </button>
+                <button onClick={() => openEditar(sala)}>Editar</button>
+                <button onClick={() => handleToggle(sala)}>...</button>
+                <button onClick={() => handleDeletar(sala)}>Excluir</button>
               </div>
             </div>
           ))}
@@ -186,7 +151,7 @@ export default function GerenciarSalasPage() {
 
       {modal !== null && (
         <Modal
-          title={modal === 'criar' ? 'Nova Sala' : `Editar — ${(modal as Sala).nome}`}
+          title={modal.tipo === 'criar' ? 'Nova Sala' : `Editar — ${(modal as { tipo: 'editar'; sala: Sala }).sala.nome}`}
           onClose={() => setModal(null)}
         >
           <div className="space-y-4">
@@ -215,30 +180,18 @@ export default function GerenciarSalasPage() {
               </div>
             </div>
 
-            {error && (
-              <div className="px-3 py-2.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
-                <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
-              </div>
-            )}
+            <Alert message={error} />
 
             <div className="flex gap-3 pt-2">
               <button onClick={() => setModal(null)} className="btn-secondary flex-1">
                 Cancelar
               </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !form.nome.trim()}
-                className="btn-primary flex-1 flex items-center justify-center gap-2"
-              >
-                {saving
-                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Salvando...</>
-                  : 'Salvar'
-                }
-              </button>
+              <SaveButton saving={saving} onClick={handleSave} disabled={!form.nome.trim()} />
             </div>
           </div>
         </Modal>
       )}
+      {confirmModal}
     </div>
   );
 }

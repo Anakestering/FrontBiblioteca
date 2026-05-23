@@ -5,6 +5,10 @@ import { aprovacoes as aprovacaoApi } from '@/lib/api';
 import { AprovacaoReserva } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { maskCpf, maskTel } from '@/lib/utils';
+import { Alert } from '@/app/components/ui/ErrorAlert';
+import { LoadingList } from '@/app/components/ui/LoadingList';
+import { EmptyState } from '@/app/components/ui/EmptyState';
+import { Modal } from '@/app/components/ui/Modal';
 
 type FiltroTipo = 'todos' | 'COMPUTADOR' | 'SALA';
 
@@ -36,147 +40,136 @@ function DetalheModal({ ap, onClose, onDecisao }: {
       await onDecisao(ap.id, acao, motivo || undefined);
       onClose();
     } catch (e: unknown) {
+      console.error('Erro ao processar aprovação:', e);
       setError(e instanceof Error ? e.message : 'Erro');
       setActing(null);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-[#161b22] rounded-2xl shadow-2xl w-full max-w-md">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <div className="flex items-center gap-2">
-            <span className={`text-xs font-bold px-2 py-0.5 rounded ${isPC
-              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-              : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
-              {isPC ? 'COMPUTADOR' : 'SALA'}
-            </span>
+    <Modal
+      title={
+        <span className={`text-xs font-bold px-2 py-0.5 rounded ${isPC
+          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+          : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
+          {isPC ? 'COMPUTADOR' : 'SALA'}
+        </span>
+      }
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+
+
+        {/* Itens */}
+        <div>
+          <p className="text-xs text-[var(--text-muted)] mb-2">{isPC ? 'Computadores' : 'Salas'}</p>
+          <div className="flex flex-wrap gap-2">
+            {itens.map((item, i) => (
+              <span key={i} className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${isPC
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-mono'
+                : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'}`}>
+                {item}
+              </span>
+            ))}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)]">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
 
-        <div className="p-6 space-y-4">
-
-          {/* Itens */}
-          <div>
-            <p className="text-xs text-[var(--text-muted)] mb-2">{isPC ? 'Computadores' : 'Salas'}</p>
-            <div className="flex flex-wrap gap-2">
-              {itens.map((item, i) => (
-                <span key={i} className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${isPC
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-mono'
-                  : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'}`}>
-                  {item}
-                </span>
-              ))}
-            </div>
+        {/* Dados do usuário */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Nome</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.usuario.nome}</p>
           </div>
-
-          {/* Dados do usuário */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Nome</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.usuario.nome}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">E-mail</p>
-              <p className="text-xs text-[var(--text-muted)]">{pedido.usuario.email}</p>
-            </div>
-            {pedido.usuario.cpf && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">CPF</p>
-                <p className="text-xs text-[var(--text-muted)] font-mono">{maskCpf(pedido.usuario.cpf)}</p>
-              </div>
-            )}
-            {pedido.usuario.telefone && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">Telefone</p>
-                <p className="text-xs text-[var(--text-muted)]">{maskTel(pedido.usuario.telefone)}</p>
-
-              </div>
-            )}
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">E-mail</p>
+            <p className="text-xs text-[var(--text-muted)]">{pedido.usuario.email}</p>
           </div>
-
-          {/* Data, horário, pessoas, solicitado, obs */}
-          <div className="grid grid-cols-2 gap-3">
+          {pedido.usuario.cpf && (
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatDate(pedido.inicioPrevisto)}
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Horário</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Pessoas</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.qtdePessoas}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Solicitado em</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatDate(ap.solicitadaEm)}
-              </p>
-            </div>
-          </div>
-
-          {pedido.observacao && (
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Observação</p>
-              <p className="text-sm text-[var(--text-secondary)]">{pedido.observacao}</p>
+              <p className="text-xs text-[var(--text-muted)] mb-1">CPF</p>
+              <p className="text-xs text-[var(--text-muted)] font-mono">{maskCpf(pedido.usuario.cpf)}</p>
             </div>
           )}
+          {pedido.usuario.telefone && (
+            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+              <p className="text-xs text-[var(--text-muted)] mb-1">Telefone</p>
+              <p className="text-xs text-[var(--text-muted)]">{maskTel(pedido.usuario.telefone)}</p>
 
-          {/* Motivo + botoes */}
-          <div className="space-y-3 pt-2 border-t border-[var(--border)]">
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Motivo (opcional)"
-              value={motivo}
-              onChange={e => setMotivo(e.target.value)}
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => handle('rejeitar')}
-                disabled={!!acting}
-                className="btn-danger flex-1 flex items-center justify-center gap-2"
-              >
-                {acting === 'rejeitar'
-                  ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  : '✕'}
-                Rejeitar
-              </button>
-              <button
-                onClick={() => handle('aprovar')}
-                disabled={!!acting}
-                className="btn-success flex-1 flex items-center justify-center gap-2"
-              >
-                {acting === 'aprovar'
-                  ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  : '✓'}
-                Aprovar
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
-              <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
             </div>
           )}
         </div>
+
+        {/* Data, horário, pessoas, solicitado, obs */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {formatDate(pedido.inicioPrevisto)}
+            </p>
+          </div>
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Horário</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
+            </p>
+          </div>
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Pessoas</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.qtdePessoas}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Solicitado em</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {formatDate(ap.solicitadaEm)}
+            </p>
+          </div>
+        </div>
+
+        {pedido.observacao && (
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Observação</p>
+            <p className="text-sm text-[var(--text-secondary)]">{pedido.observacao}</p>
+          </div>
+        )}
+
+        {/* Motivo + botoes */}
+        <div className="space-y-3 pt-2 border-t border-[var(--border)]">
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Motivo (opcional)"
+            value={motivo}
+            onChange={e => setMotivo(e.target.value)}
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={() => handle('rejeitar')}
+              disabled={!!acting}
+              className="btn-danger flex-1 flex items-center justify-center gap-2"
+            >
+              {acting === 'rejeitar'
+                ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : '✕'}
+              Rejeitar
+            </button>
+            <button
+              onClick={() => handle('aprovar')}
+              disabled={!!acting}
+              className="btn-success flex-1 flex items-center justify-center gap-2"
+            >
+              {acting === 'aprovar'
+                ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : '✓'}
+              Aprovar
+            </button>
+          </div>
+        </div>
+
+        <Alert message={error} />
       </div>
-    </div>
+    </Modal >
+
   );
 }
 
@@ -248,8 +241,11 @@ export default function AprovacoesPage() {
 
   const loadList = async () => {
     setLoading(true);
-    try { setList(await aprovacaoApi.pendentes()); }
-    catch (_) { }
+    try {
+      setList(await aprovacaoApi.pendentes());
+    } catch (err) {
+      console.error('Erro ao carregar aprovações:', err);
+    }
     setLoading(false);
   };
 
@@ -274,9 +270,6 @@ export default function AprovacoesPage() {
       {/* Header */}
       <div>
         <h1 className="page-title">Aprovações Pendentes</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-1">
-          Mais de 3 computadores, mais de 1 sala ou mais de 3 blocos consecutivos requerem aprovação
-        </p>
       </div>
 
       {/* Filtros */}
@@ -295,7 +288,7 @@ export default function AprovacoesPage() {
             ? 'bg-blue-600 text-white'
             : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]'}`}
         >
-          💻 Computadores ({pcCount})
+          Computadores ({pcCount})
         </button>
         <button
           onClick={() => setFiltroTipo('SALA')}
@@ -303,27 +296,17 @@ export default function AprovacoesPage() {
             ? 'bg-violet-600 text-white'
             : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]'}`}
         >
-          🏫 Salas ({salaCount})
+          Salas ({salaCount})
         </button>
       </div>
 
       {/* Lista */}
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl shimmer" />)}
+          <LoadingList items={3} height="h-20" />
         </div>
       ) : listFiltrada.length === 0 ? (
-        <div className="card p-16 text-center">
-          <svg className="w-12 h-12 text-emerald-500 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <p className="text-[var(--text-secondary)] font-medium">
-            {list.length === 0 ? 'Tudo em dia!' : 'Nenhuma aprovação nesta categoria'}
-          </p>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            {list.length === 0 ? 'Nenhuma reserva aguardando aprovação' : 'Tente selecionar outro filtro'}
-          </p>
-        </div>
+        <EmptyState message={list.length === 0 ? 'Nenhuma reserva aguardando aprovação' : 'Nenhuma aprovação nesta categoria'} />
       ) : (
         <div className="card divide-y divide-[var(--border)]">
           {listFiltrada.map(ap => (

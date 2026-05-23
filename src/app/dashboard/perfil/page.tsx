@@ -68,9 +68,11 @@ export default function PerfilPage() {
         setEmail(me.email ?? '');
         setCpf(maskCpf(me.cpf ?? ''));
         setTelefone(maskTel(me.telefone ?? ''));
-      } catch (_) {
+      } catch (err) {
+        console.error('Erro ao carregar perfil:', err);
         setErrorMsg('Não foi possível carregar seus dados. Tente recarregar a página.');
-      } finally {
+      }
+      finally {
         setLoading(false);
       }
     }
@@ -88,7 +90,10 @@ export default function PerfilPage() {
         telefone: telefone ? telefone.replace(/\D/g, '') : undefined,
       });
       setSuccessMsg('Dados atualizados com sucesso!');
-    } catch (e: any) { setErrorMsg(e instanceof Error ? e.message : 'Erro ao salvar'); }
+    } catch (e: unknown) {
+      console.error('Erro ao salvar:', e);
+      setErrorMsg(e instanceof Error ? e.message : 'Erro ao salvar');
+    }
     setSaving(false);
   };
 
@@ -102,7 +107,9 @@ export default function PerfilPage() {
       setSuccessPwd('Senha alterada com sucesso! Redirecionando...');
       setSenhaAtual(''); setNovaSenha(''); setConfirmarSenha(''); setShowSenhas(false);
       setTimeout(() => { logout(); router.push('/login'); }, 2000);
-    } catch (e: any) { setErrorPwd(e instanceof Error ? e.message : 'Erro ao alterar senha'); }
+    } catch (e: unknown) { 
+      console.error('Erro ao alterar senha:', e);
+      setErrorPwd(e instanceof Error ? e.message : 'Erro ao alterar senha'); }
     setSavingPwd(false);
   };
 
@@ -116,7 +123,9 @@ export default function PerfilPage() {
       setTempoReenvio(30);
       setEmailCodigoEnviado(perfil.email);
       setModoRecuperacao(true);
-    } catch (e: any) { setErrorPwd(e instanceof Error ? e.message : 'Erro ao enviar código'); }
+    } catch (e: unknown) { 
+      console.error('Erro ao enviar codigo:', e);
+      setErrorPwd(e instanceof Error ? e.message : 'Erro ao enviar código'); }
   };
 
   const handleConfirmarRecuperacao = async () => {
@@ -131,7 +140,9 @@ export default function PerfilPage() {
       setSuccessPwd('Senha alterada com sucesso! Redirecionando...');
       setCodigo(''); setNovaSenhaRec(''); setConfirmarSenhaRec(''); setModoRecuperacao(false); setShowSenhas(false);
       setTimeout(() => { logout(); router.push('/login'); }, 2000);
-    } catch (e: any) { setErrorPwd(e instanceof Error ? e.message : 'Erro ao alterar senha'); }
+    } catch (e: unknown) { 
+      console.error('Erro ao alterar senha:', e);
+      setErrorPwd(e instanceof Error ? e.message : 'Erro ao alterar senha'); }
     setSavingPwd(false);
   };
 

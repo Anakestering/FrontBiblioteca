@@ -6,6 +6,11 @@ import Link from 'next/link';
 import { aprovacoes as aprovacaoApi, pedidos as pedidosApi } from '@/lib/api';
 import { PedidoReserva, AprovacaoReserva, StatusReserva, TipoPedido } from '@/types';
 import { statusReservaLabel, statusReservaColor, formatDateTime, maskCpf, maskTel } from '@/lib/utils';
+import { Alert } from '@/app/components/ui/ErrorAlert';
+import { EmptyState } from '@/app/components/ui/EmptyState';
+import { LoadingList } from '@/app/components/ui/LoadingList';
+import { useConfirm } from '@/app/hooks/useConfirm';
+import { Modal } from '@/app/components/ui/Modal';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -55,23 +60,31 @@ function DetalheModal({ pedido, aprovacoes, onClose, onRefresh }: {
   const aprovacaoPendente = aprovacoes.find(ap => ap.pedido?.id === pedido.id);
   const podeAprovar = pedido.status === 'PENDENTE_APROVACAO' && !!aprovacaoPendente;
   const podeCancelar = STATUS_ATIVAS.includes(pedido.status);
+  const { openConfirm, confirmModal } = useConfirm();
 
   const primeiraReserva = isPC
     ? pedido.reservasComputador[0]
     : pedido.reservasSala[0];
 
-  const handleCancelar = async () => {
-    if (!confirm('Cancelar esta reserva?')) return;
-    setActing('cancelar');
-    setError('');
-    try {
-      await pedidosApi.cancelarComoAdmin(pedido.id);
-      await onRefresh();
-      onClose();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erro ao cancelar');
-    }
-    setActing(null);
+  const handleCancelar = () => {
+    openConfirm({
+      title: 'Cancelar reserva',
+      message: 'Cancelar esta reserva? Esta ação não pode ser desfeita.',
+      confirmLabel: 'Cancelar reserva',
+      confirmStyle: 'danger',
+      onConfirm: async () => {
+        setActing('cancelar');
+        setError('');
+        try {
+          await pedidosApi.cancelarComoAdmin(pedido.id);
+          await onRefresh();
+          onClose();
+        } catch (e: unknown) {
+          setError(e instanceof Error ? e.message : 'Erro ao cancelar');
+        }
+        setActing(null);
+      },
+    });
   };
 
   const handleAprovacao = async (acao: 'aprovar' | 'rejeitar') => {
@@ -84,165 +97,158 @@ function DetalheModal({ pedido, aprovacoes, onClose, onRefresh }: {
       await onRefresh();
       onClose();
     } catch (e: unknown) {
+      console.error('Erro ao processar aprovação:', e);
       setError(e instanceof Error ? e.message : 'Erro');
     }
     setActing(null);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-[#161b22] rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
 
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <div className="flex items-center gap-2">
-            <span className={`text-xs font-bold px-2 py-0.5 rounded ${isPC
-              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-              : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
-              {isPC ? 'COMPUTADOR' : 'SALA'}
-            </span>
-            <span className="text-xs text-[var(--text-muted)]">Pedido #{pedido.id}</span>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)]">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <Modal
+      title={
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-bold px-2 py-0.5 rounded ${isPC
+            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+            : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
+            {isPC ? 'COMPUTADOR' : 'SALA'}
+          </span>
+          <span className="text-xs text-[var(--text-muted)]">Pedido #{pedido.id}</span>
         </div>
+      }
+      onClose={onClose}
+      maxWidth="lg"
+    >
+      <div className="space-y-4">
 
-        <div className="overflow-y-auto flex-1 p-6 space-y-4">
-
-          {/* Itens */}
-          <div>
-            <p className="text-xs text-[var(--text-muted)] mb-2">{isPC ? 'Computadores' : 'Salas'}</p>
-            <div className="flex flex-wrap gap-2">
-              {itens.map((item, i) => (
-                <span key={i} className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${isPC
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-mono'
-                  : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'}`}>
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Dados do usuário */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Nome</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.usuario.nome}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">E-mail</p>
-              <p className="text-xs text-[var(--text-muted)]">{pedido.usuario.email}</p>
-            </div>
-            {pedido.usuario.cpf && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">CPF</p>
-                <p className="text-xs font-mono text-[var(--text-muted)]">{maskCpf(pedido.usuario.cpf)}</p>
-              </div>
-            )}
-            {pedido.usuario.telefone && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">Telefone</p>
-                <p className="text-xs text-[var(--text-muted)]">{maskTel(pedido.usuario.telefone)}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Detalhes da reserva */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Status</p>
-              <span className={`badge ${statusReservaColor[pedido.status]}`}>
-                {statusReservaLabel[pedido.status]}
+        {/* Itens */}
+        <div>
+          <p className="text-xs text-[var(--text-muted)] mb-2">{isPC ? 'Computadores' : 'Salas'}</p>
+          <div className="flex flex-wrap gap-2">
+            {itens.map((item, i) => (
+              <span key={i} className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${isPC
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-mono'
+                : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'}`}>
+                {item}
               </span>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Pessoas</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.qtdePessoas}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatDataCurta(pedido.inicioPrevisto)}
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Horário</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
-              </p>
-            </div>
-            {primeiraReserva?.checkinEm && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">Check-in</p>
-                <p className="text-sm font-medium text-[var(--text-primary)]">
-                  {formatDateTime(primeiraReserva.checkinEm)}
-                </p>
-              </div>
-            )}
-            {primeiraReserva?.checkoutEm && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">Check-out</p>
-                <p className="text-sm font-medium text-[var(--text-primary)]">
-                  {formatDateTime(primeiraReserva.checkoutEm)}
-                </p>
-              </div>
-            )}
+            ))}
           </div>
+        </div>
 
-          {pedido.observacao && (
+        {/* Dados do usuário */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Nome</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.usuario.nome}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">E-mail</p>
+            <p className="text-xs text-[var(--text-muted)]">{pedido.usuario.email}</p>
+          </div>
+          {pedido.usuario.cpf && (
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Observação</p>
-              <p className="text-sm text-[var(--text-secondary)]">{pedido.observacao}</p>
+              <p className="text-xs text-[var(--text-muted)] mb-1">CPF</p>
+              <p className="text-xs font-mono text-[var(--text-muted)]">{maskCpf(pedido.usuario.cpf)}</p>
             </div>
           )}
-
-          {/* Ações */}
-          {(podeAprovar || podeCancelar) && (
-            <div className="space-y-3 pt-2 border-t border-[var(--border)]">
-              {podeAprovar && (
-                <div className="space-y-2">
-                  <input type="text" className="input-field text-sm" placeholder="Motivo (opcional)"
-                    value={motivo} onChange={e => setMotivo(e.target.value)} />
-                  <div className="flex gap-2">
-                    <button onClick={() => handleAprovacao('rejeitar')} disabled={!!acting}
-                      className="btn-danger flex-1 flex items-center justify-center gap-2 text-sm">
-                      {acting === 'rejeitar'
-                        ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        : '✕'}
-                      Rejeitar
-                    </button>
-                    <button onClick={() => handleAprovacao('aprovar')} disabled={!!acting}
-                      className="btn-success flex-1 flex items-center justify-center gap-2 text-sm">
-                      {acting === 'aprovar'
-                        ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        : '✓'}
-                      Aprovar
-                    </button>
-                  </div>
-                </div>
-              )}
-              {podeCancelar && (
-                <button onClick={handleCancelar} disabled={!!acting}
-                  className="btn-danger w-full flex items-center justify-center gap-2 text-sm">
-                  {acting === 'cancelar' &&
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                  {acting === 'cancelar' ? 'Cancelando...' : 'Cancelar reserva'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {error && (
-            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
-              <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
+          {pedido.usuario.telefone && (
+            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+              <p className="text-xs text-[var(--text-muted)] mb-1">Telefone</p>
+              <p className="text-xs text-[var(--text-muted)]">{maskTel(pedido.usuario.telefone)}</p>
             </div>
           )}
         </div>
+
+        {/* Detalhes da reserva */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Status</p>
+            <span className={`badge ${statusReservaColor[pedido.status]}`}>
+              {statusReservaLabel[pedido.status]}
+            </span>
+          </div>
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Pessoas</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.qtdePessoas}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {formatDataCurta(pedido.inicioPrevisto)}
+            </p>
+          </div>
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Horário</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
+            </p>
+          </div>
+          {primeiraReserva?.checkinEm && (
+            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+              <p className="text-xs text-[var(--text-muted)] mb-1">Check-in</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">
+                {formatDateTime(primeiraReserva.checkinEm)}
+              </p>
+            </div>
+          )}
+          {primeiraReserva?.checkoutEm && (
+            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+              <p className="text-xs text-[var(--text-muted)] mb-1">Check-out</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">
+                {formatDateTime(primeiraReserva.checkoutEm)}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {pedido.observacao && (
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Observação</p>
+            <p className="text-sm text-[var(--text-secondary)]">{pedido.observacao}</p>
+          </div>
+        )}
+
+        {/* Ações */}
+        {(podeAprovar || podeCancelar) && (
+          <div className="space-y-3 pt-2 border-t border-[var(--border)]">
+            {podeAprovar && (
+              <div className="space-y-2">
+                <input type="text" className="input-field text-sm" placeholder="Motivo (opcional)"
+                  value={motivo} onChange={e => setMotivo(e.target.value)} />
+                <div className="flex gap-2">
+                  <button onClick={() => handleAprovacao('rejeitar')} disabled={!!acting}
+                    className="btn-danger flex-1 flex items-center justify-center gap-2 text-sm">
+                    {acting === 'rejeitar'
+                      ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : '✕'}
+                    Rejeitar
+                  </button>
+                  <button onClick={() => handleAprovacao('aprovar')} disabled={!!acting}
+                    className="btn-success flex-1 flex items-center justify-center gap-2 text-sm">
+                    {acting === 'aprovar'
+                      ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : '✓'}
+                    Aprovar
+                  </button>
+                </div>
+              </div>
+            )}
+            {podeCancelar && (
+              <button onClick={handleCancelar} disabled={!!acting}
+                className="btn-danger w-full flex items-center justify-center gap-2 text-sm">
+                {acting === 'cancelar' &&
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                {acting === 'cancelar' ? 'Cancelando...' : 'Cancelar reserva'}
+              </button>
+            )}
+          </div>
+        )}
+
+        <Alert message={error} />
+
+        {confirmModal}
       </div>
-    </div>
+    </Modal >
   );
 }
 
@@ -289,6 +295,7 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () =>
           </svg>
         </div>
       </div>
+
     </div>
   );
 }
@@ -320,7 +327,9 @@ function ReservasAdminPage() {
       ]);
       setTodosPedidos(ped);
       setAprovacoes(ap);
-    } catch (_) { }
+    } catch (err) {
+      console.error('Erro ao carregar reservas:', err);
+    }
     setLoading(false);
   };
 
@@ -354,8 +363,8 @@ function ReservasAdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">Todas as Reservas</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            {todosPedidos.length} {todosPedidos.length !== 1 ? '' : ''} até hoje
+          <p>{pedidosFiltrados.length} resultado{pedidosFiltrados.length !== 1 ? 's' : ''}
+            {(statusFilter || dataFiltro || search) ? ' (filtrado)' : ''}
           </p>
         </div>
         <Link href="/dashboard/usuario/reservar" className="btn-primary flex items-center gap-2">
@@ -415,12 +424,10 @@ function ReservasAdminPage() {
       {/* Lista */}
       {loading ? (
         <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 rounded-xl shimmer" />)}
+          <LoadingList items={5} />
         </div>
       ) : pedidosFiltrados.length === 0 ? (
-        <div className="card p-12 text-center">
-          <p className="text-[var(--text-secondary)]">Nenhuma reserva encontrada</p>
-        </div>
+        <EmptyState message="Nenhuma reserva encontrada" />
       ) : (
         <div className="card divide-y divide-[var(--border)]">
           {pedidosFiltrados.map(p => (
@@ -440,6 +447,8 @@ function ReservasAdminPage() {
           onRefresh={loadAll}
         />
       )}
+
+
     </div>
   );
 }

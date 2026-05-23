@@ -149,7 +149,7 @@ export const pedidos = {
 export const usuarios = {
   listar: () => request<Usuario[]>('/usuarios'),           // só admin deve usar
   buscarMe: () => request<Usuario>('/usuarios/me'),        // novo — perfil do usuário logado
-  buscar: (id: number) => request<Usuario>(`/usuarios/${id}`),
+  buscarPorTermo: (termo: string) => request<Usuario[]>(`/usuarios/buscar?termo=${encodeURIComponent(termo)}`),
   atualizar: (id: number, dto: Partial<{ nome: string; email: string; cpf: string; telefone?: string }>) =>
     request<Usuario>(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id: number) => request<void>(`/usuarios/${id}`, { method: 'DELETE' }),
@@ -157,4 +157,5 @@ export const usuarios = {
     request(`/usuarios/${id}/ativar`, { method: 'PUT' }),
   trocarSenha: (dto: TrocarSenhaDTO) =>
     request<{ message: string }>('/usuarios/me/senha', { method: 'PATCH', body: JSON.stringify(dto) }),
+  stats: () => request<{ total: number; ativos: number; cadastradosNaSemana: number }>('/usuarios/stats'),
 };

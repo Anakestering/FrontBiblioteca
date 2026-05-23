@@ -35,6 +35,7 @@ export default function CadastroPage() {
       });
       router.push('/login?cadastro=ok');
     } catch (err: unknown) {
+      console.error('Erro ao cadastrar:', err);
       setError(err instanceof Error ? err.message : 'Erro ao cadastrar');
     } finally {
       setLoading(false);

@@ -74,6 +74,7 @@ export default function RecuperarSenhaPage() {
             setTempoReenvio(30);
             setMostrarEtapa2(true);
         } catch (e: unknown) {
+            console.error('Erro ao solicitar recuperação:', e);
             setErro(e instanceof Error ? e.message : 'Erro ao solicitar recuperação de senha.');
         }
         setLoading(false);
@@ -94,6 +95,7 @@ export default function RecuperarSenhaPage() {
             setMensagem('Senha alterada com sucesso!');
             setTimeout(() => router.push('/login'), 2000);
         } catch (error) {
+            console.error('Erro ao alterar senha:', error);
             setErro(error instanceof Error ? error.message : 'Erro ao alterar senha.');
         }
         setLoading(false);
@@ -220,9 +222,6 @@ export default function RecuperarSenhaPage() {
                                 />
                                 {senhasNaoCoincidem && (
                                     <p className="text-xs text-rose-500 mt-1">As senhas devem ser iguais.</p>
-                                )}
-                                {novaSenha.length > 18 && (
-                                    <p className="text-xs text-rose-500 mt-1">A senha deve ter no máximo 18 caracteres.</p>
                                 )}
                             </div>
 

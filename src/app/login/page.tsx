@@ -21,6 +21,7 @@ export default function LoginPage() {
       const res = await auth.login({ email, senha });
       login(res.token, res.tipo, email);
     } catch (err: unknown) {
+      console.error('Erro ao fazer login:', err);
       setError(err instanceof Error ? err.message : 'Credenciais inválidas');
     } finally {
       setLoading(false);

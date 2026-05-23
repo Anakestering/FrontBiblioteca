@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -80,6 +80,7 @@ function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: {
       await onRefresh();
       onClose();
     } catch (e: unknown) {
+      console.error('Erro ao cancelar pedido:', e);
       setError(e instanceof Error ? e.message : 'Erro ao cancelar');
     }
     setActing(null);
@@ -95,6 +96,7 @@ function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: {
       await onRefresh();
       onClose();
     } catch (e: unknown) {
+      console.error('Erro ao processar aprovação:', e);
       setError(e instanceof Error ? e.message : 'Erro');
     }
     setActing(null);
@@ -268,6 +270,8 @@ export default function AdminDashboard() {
   const today = new Date();
   const router = useRouter();
   const weekDays = getWeekDays(weekOffset);
+  const selectedPedidoRef = useRef(selectedPedido);
+  selectedPedidoRef.current = selectedPedido;
 
   const fetchAll = useCallback(async () => {
     if (typeof window !== 'undefined' && !localStorage.getItem('token')) return;
@@ -284,7 +288,9 @@ export default function AdminDashboard() {
       setUsersCount(u.length);
       setAllPcs(pcs);
       setAllSalas(sls);
-    } catch (_) { }
+    } catch (err) {
+      console.error('Erro ao carregar dados do admin:', err);
+    }
     setLoading(false);
   }, []);
 
@@ -321,10 +327,9 @@ export default function AdminDashboard() {
   }, [weekOffset]);
 
   useEffect(() => {
-    if (selectedPedido) {
-      const atualizado = pedidos.find(p => p.id === selectedPedido.id);
-      if (atualizado) setSelectedPedido(atualizado);
-    }
+    if (!selectedPedidoRef.current) return;
+    const atualizado = pedidos.find(p => p.id === selectedPedidoRef.current!.id);
+    if (atualizado) setSelectedPedido(atualizado);
   }, [pedidos]);
 
   const pedidosHojePC = pedidos.filter(p => p.tipo === 'COMPUTADOR' && isSameDay(new Date(p.inicioPrevisto), today));
@@ -344,10 +349,6 @@ export default function AdminDashboard() {
 
   const totalPcsAtivos = allPcs.filter(p => p.ativo).length;
   const totalSalasAtivas = allSalas.filter(s => s.ativo).length;
-
-  const aguardandoCheckin = pedidos.filter(p =>
-    isSameDay(new Date(p.inicioPrevisto), today) && naJanelaCheckin(p)
-  );
 
   const pedidosDiaFiltrados = pedidos
     .filter(p => isSameDay(new Date(p.inicioPrevisto), selectedDay))

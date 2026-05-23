@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   computadores as computadoresApi,
@@ -12,6 +12,9 @@ import {
 } from '@/lib/api';
 import { Computador, Sala, Usuario } from '@/types';
 import { useAuth } from '@/lib/auth-context';
+import { Alert } from '@/app/components/ui/ErrorAlert';
+import { LoadingList } from '@/app/components/ui/LoadingList';
+import { EmptyState } from '@/app/components/ui/EmptyState';
 
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -206,7 +209,12 @@ export default function ReservarPage() {
         )
       );
     }
-    Promise.all(fetches).finally(() => setLoadingDados(false));
+    Promise.all(fetches)
+      .catch(err => {
+        console.error('Erro ao carregar dados:', err);
+        setError('Não foi possível carregar os dados. Recarregue a página.');
+      })
+      .finally(() => setLoadingDados(false));
   }, [isAdmin]);
 
   // ── Busca horários ocupados quando muda dia ou itens selecionados ───────────
@@ -276,9 +284,11 @@ export default function ReservarPage() {
           return !resultados.some(({ ocupadosSet }) => ocupadosSet.has(horaBloco));
         })
       );
-    } catch {
+    } catch (err) {
       // Silencioso — blocos simplesmente não serão marcados como ocupados
-    } finally {
+      console.error('Erro ao buscar horários ocupados:', err);
+    }
+    finally {
       setLoadingOcupados(false);
     }
   }, [diaSelecionado, itensSelecionados, tipo]);
@@ -340,7 +350,7 @@ export default function ReservarPage() {
     return itensSelecionados.some(id => ocupados[id]?.has(hora));
   };
 
-  const BLOCOS_MAX_SEM_APROVACAO = 3; 
+  const BLOCOS_MAX_SEM_APROVACAO = 3;
 
   const precisaAprovacao = (() => {
     if (tipo === 'computador') {
@@ -350,11 +360,13 @@ export default function ReservarPage() {
     }
   })();
 
-  const diasDisponiveis = Array.from({ length: 31 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    return d;
-  });
+  const diasDisponiveis = useMemo(() =>
+    Array.from({ length: 31 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return d;
+    }),
+    []);
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
@@ -405,8 +417,10 @@ export default function ReservarPage() {
       );
       setTimeout(() => router.push(isAdmin ? '/dashboard/admin' : '/dashboard/usuario'), 2000);
     } catch (err: unknown) {
+      console.error('Erro ao criar reserva:', err);
       setError(err instanceof Error ? err.message : 'Erro ao criar reserva');
-    } finally {
+    }
+    finally {
       setSubmitting(false);
     }
   };
@@ -475,7 +489,7 @@ export default function ReservarPage() {
                 </button>
               </div>
             ) : loadingDados ? (
-              <div className="h-11 rounded-lg shimmer" />
+               <LoadingList items={1} height="h-11" />
             ) : (
               <BuscaUsuario usuarios={todosUsuarios} onSelecionar={setUsuarioVinculado} />
             )}
@@ -526,9 +540,7 @@ export default function ReservarPage() {
               {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-16 rounded-lg shimmer" />)}
             </div>
           ) : itensDisponiveis.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">
-              Nenhum {tipo === 'computador' ? 'computador' : 'sala'} disponível no momento.
-            </p>
+             <EmptyState message={`Nenhum ${tipo === 'computador' ? 'computador' : 'sala'} disponível no momento.`} />
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {itensDisponiveis.map(item => {
@@ -728,19 +740,8 @@ export default function ReservarPage() {
         )}
 
         {/* Feedback */}
-        {error && (
-          <div className="p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-sm text-rose-700 dark:text-rose-300">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
-            <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            {success}
-          </div>
-        )}
+        <Alert message={error} />
+        <Alert message={success} type="success" />
 
         {/* Ações */}
         <div className="flex gap-3 pb-8">

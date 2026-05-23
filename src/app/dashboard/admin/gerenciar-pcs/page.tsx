@@ -2,44 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { computadores as computadoresApi } from '@/lib/api';
+import { Computador, ComputadorDTO } from '@/types';
+import { Modal } from '@/app/components/ui/Modal';
+import { Alert } from '@/app/components/ui/ErrorAlert';
+import { ActiveBadge } from '@/app/components/ui/ActiveBadge';
+import { EmptyState } from '@/app/components/ui/EmptyState';
+import { LoadingList } from '@/app/components/ui/LoadingList';
+import { SaveButton } from '@/app/components/ui/SaveButton';
+import { SearchInput } from '@/app/components/ui/SearchInput';
+import { PageHeader } from '@/app/components/ui/PageHeader';
+import { useConfirm } from '@/app/hooks/useConfirm';
 
-interface Computador {
-  id: number;
-  codigo: string;
-  capacidadePessoas: number;
-  observacao?: string;
-  ativo: boolean;
-}
-
-interface ComputadorDTO {
-  codigo: string;
-  capacidadePessoas: number;
-  observacao?: string;
-}
-
-// ─── Modal genérico ───────────────────────────────────────────────────────────
-function Modal({ title, onClose, children }: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-[#161b22] rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)]">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Modal de detalhes do PC ──────────────────────────────────────────────────
 function DetalhesModal({ pc, onClose, onEditar, onToggle, onDeletar }: {
@@ -56,9 +29,7 @@ function DetalhesModal({ pc, onClose, onEditar, onToggle, onDeletar }: {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-[var(--text-muted)]">Status</span>
-            <span className={`font-medium ${pc.ativo ? 'text-green-600 dark:text-green-400' : 'text-rose-500'}`}>
-              {pc.ativo ? 'Ativo' : 'Inativo'}
-            </span>
+            <ActiveBadge ativo={pc.ativo} />
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-[var(--text-muted)]">Capacidade</span>
@@ -121,10 +92,48 @@ export default function GerenciarComputadoresPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const { openConfirm, confirmModal } = useConfirm();
+
+
   const loadList = async () => {
     setLoading(true);
-    try { setList(await computadoresApi.listarTodos()); } catch (_) { }
+    try {
+      setList(await computadoresApi.listarTodos());
+    } catch (err) {
+      console.error('Erro ao carregar computadores:', err);
+    }
     setLoading(false);
+  };
+
+  const handleToggle = (pc: Computador) => {
+    openConfirm({
+      title: pc.ativo ? 'Desativar computador' : 'Ativar computador',
+      message: pc.ativo
+        ? `Desativar "${pc.codigo}"? Ele não aparecerá para reservas.`
+        : `Ativar "${pc.codigo}"?`,
+      confirmLabel: pc.ativo ? 'Desativar' : 'Ativar',
+      confirmStyle: pc.ativo ? 'warning' : 'success',
+      onConfirm: async () => {
+        if (pc.ativo) await computadoresApi.desativar(pc.id);
+        else await computadoresApi.ativar(pc.id);
+        await loadList();
+        setModal(null);
+      },
+    });
+  };
+
+  const handleDeletar = (pc: Computador) => {
+    openConfirm({
+      title: 'Excluir computador',
+      message: `Excluir permanentemente "${pc.codigo}"? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      confirmStyle: 'danger',
+      onConfirm: async () => {
+        await computadoresApi.deletar(pc.id);
+        await loadList();
+        setModal(null);
+      },
+    });
   };
 
   useEffect(() => { loadList(); }, []);
@@ -148,24 +157,10 @@ export default function GerenciarComputadoresPage() {
       await loadList();
       setModal(null);
     } catch (e: unknown) {
+      console.error('Erro ao salvar computador:', e);
       setError(e instanceof Error ? e.message : 'Erro ao salvar');
     }
     setSaving(false);
-  };
-
-  const handleToggle = async (pc: Computador) => {
-    try {
-      if (pc.ativo) await computadoresApi.desativar(pc.id);
-      else await computadoresApi.ativar(pc.id);
-      await loadList();
-      setModal(null);
-    } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Erro'); }
-  };
-
-  const handleDeletar = async (pc: Computador) => {
-    if (!confirm(`Excluir permanentemente "${pc.codigo}"? Esta ação não pode ser desfeita.`)) return;
-    try { await computadoresApi.deletar(pc.id); await loadList(); setModal(null); }
-    catch (e: unknown) { alert(e instanceof Error ? e.message : 'Erro'); }
   };
 
   const filtered = list.filter(p =>
@@ -178,30 +173,19 @@ export default function GerenciarComputadoresPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">Gerenciar Computadores</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            {ativos.length} ativo{ativos.length !== 1 ? 's' : ''} · {inativos.length} inativo{inativos.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <button onClick={openCriar} className="btn-primary flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Novo Computador
-        </button>
-      </div>
+      <PageHeader
+        title="Gerenciar Computadores"
+        subtitle={`${ativos.length} ativo${ativos.length !== 1 ? 's' : ''} · ${inativos.length} inativo${inativos.length !== 1 ? 's' : ''}`}
+        buttonLabel="Novo Computador"
+        onButtonClick={openCriar}
+      />
 
-      <input type="text" placeholder="Buscar por código..." value={search}
-        onChange={e => setSearch(e.target.value)} className="input-field max-w-sm" />
+      <SearchInput value={search} onChange={setSearch} placeholder="Buscar por código..." />
 
       {loading ? (
-        <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl shimmer" />)}</div>
+        <LoadingList />
       ) : filtered.length === 0 ? (
-        <div className="card p-12 text-center">
-          <p className="text-[var(--text-secondary)]">Nenhum computador encontrado</p>
-        </div>
+        <EmptyState message="Nenhum computador encontrado" />
       ) : (
         <div className="card divide-y divide-[var(--border)]">
           {[...ativos, ...inativos].map(pc => (
@@ -225,19 +209,20 @@ export default function GerenciarComputadoresPage() {
                       </>
                     )}
                     <span>·</span>
-                    <span className={pc.ativo ? 'text-green-600 dark:text-green-400' : 'text-rose-500'}>
-                      {pc.ativo ? 'Ativo' : 'Inativo'}
-                    </span>
+                    <ActiveBadge ativo={pc.ativo} />
                   </p>
                 </div>
               </div>
-              
+
               <svg className="w-4 h-4 text-[var(--text-muted)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
           ))}
+
+
         </div>
+
       )}
 
       {/* Modal detalhes */}
@@ -288,24 +273,19 @@ export default function GerenciarComputadoresPage() {
               />
             </div>
 
-            {error && (
-              <div className="px-3 py-2.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
-                <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
-              </div>
-            )}
+            <Alert message={error} />
 
             <div className="flex gap-3 pt-2">
               <button onClick={() => setModal(null)} className="btn-secondary flex-1">Cancelar</button>
-              <button onClick={handleSave} disabled={saving || !form.codigo.trim()}
-                className="btn-primary flex-1 flex items-center justify-center gap-2">
-                {saving
-                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Salvando...</>
-                  : 'Salvar'}
-              </button>
+              <SaveButton saving={saving} onClick={handleSave} disabled={!form.codigo.trim()} />
             </div>
           </div>
         </Modal>
       )}
+
+      { confirmModal }
     </div>
+
+
   );
 }

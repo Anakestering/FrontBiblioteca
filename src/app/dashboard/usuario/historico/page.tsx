@@ -129,6 +129,7 @@ export default function HistoricoPage() {
   const [historico, setHistorico] = useState<PedidoReserva[]>([]);
   const [loading, setLoading] = useState(true);
   const [selecionado, setSelecionado] = useState<PedidoReserva | null>(null);
+  const [erro, setErro] = useState('');
 
   const fetchHistorico = useCallback(async () => {
     try {
@@ -138,7 +139,11 @@ export default function HistoricoPage() {
           .filter(p => STATUS_ENCERRADOS.includes(p.status))
           .sort((a, b) => new Date(b.inicioPrevisto).getTime() - new Date(a.inicioPrevisto).getTime())
       );
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      setErro('Não foi possível carregar o histórico. Tente recarregar.');
+    }
+
     setLoading(false);
   }, []);
 
@@ -152,6 +157,12 @@ export default function HistoricoPage() {
           {historico.length} reserva{historico.length !== 1 ? 's' : ''} encerrada{historico.length !== 1 ? 's' : ''}
         </p>
       </div>
+
+      {erro && (
+        <div className="p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-sm text-rose-700 dark:text-rose-300">
+          {erro}
+        </div>
+      )}
 
       {loading ? (
         <div className="card divide-y divide-[var(--border)]">

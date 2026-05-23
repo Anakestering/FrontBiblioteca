@@ -24,17 +24,19 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
+
   {
-  href: '/dashboard/usuario/historico',
-  label: 'Histórico',
-  adminOnly: false,
-  icon: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-},
+    href: '/dashboard/usuario/historico',
+    label: 'Meu historico',
+    adminOnly: false,
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+
   {
     href: '/dashboard/usuario/reservar',
     label: 'Nova Reserva',
@@ -45,7 +47,7 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
-  
+
   {
     href: '/dashboard/admin',
     label: 'Painel Admin',
@@ -103,7 +105,7 @@ const navItems: NavItem[] = [
   },
   {
     href: '/dashboard/admin/usuarios-admin',
-    label: 'Gerenciar Usuários', 
+    label: 'Gerenciar Usuários',
     adminOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -164,7 +166,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Para admins, exibe apenas a seção "Administração" (sem "Usuário")
   const adminItems = navItems.filter(i => i.adminOnly);
-  const userItems  = navItems.filter(i => !i.adminOnly);
+  const userItems = navItems.filter(i => !i.adminOnly);
 
   const NavLink = ({ item }: { item: NavItem }) => {
     const active = pathname === item.href;
@@ -172,11 +174,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Link
         href={item.href}
         onClick={() => setSidebarOpen(false)}
-        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-          active
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${active
             ? 'bg-blue-700 text-white shadow-sm shadow-blue-700/30'
             : 'text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]'
-        }`}
+          }`}
       >
         {item.icon}
         {item.label}
