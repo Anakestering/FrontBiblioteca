@@ -89,8 +89,8 @@ export const computadores = {
 
 // ─── Salas ────────────────────────────────────────────────────────────────────
 export const salas = {
-  listar: () => request<Sala[]>('/salas'),               // só ativas (para reservar)
-  listarTodas: () => request<Sala[]>('/salas/todas'),    // ativas + inativas (admin)
+  listar: () => request<Sala[]>('/salas'),               
+  listarTodas: () => request<Sala[]>('/salas/todas'),    
   buscar: (id: number) => request<Sala>(`/salas/${id}`),
   criar: (dto: SalaDTO) =>
     request<Sala>('/salas', { method: 'POST', body: JSON.stringify(dto) }),
@@ -143,6 +143,29 @@ export const pedidos = {
     request<void>(`/pedidos/${id}/checkout`, { method: 'POST' }),
   cancelar: (id: number) =>
     request<void>(`/pedidos/${id}/cancelar`, { method: 'POST' }),
+  filtrar: (params: { data?: string; dataInicio?: string; dataFim?: string; status?: string; busca?: string; }) => {
+    const query = new URLSearchParams();
+    // Filtros globais que sempre podem existir independente da rota
+    if (params.status) query.set('status', params.status);
+    if (params.busca) query.set('busca', params.busca);
+    // Se passou início e fim, vai estritamente para a rota de período
+    if (params.dataInicio && params.dataFim) {
+      query.set('dataInicio', params.dataInicio);
+      query.set('dataFim', params.dataFim);
+      return request<PedidoReserva[]>(`/pedidos/filtrar/periodo?${query.toString()}`);
+    } 
+    // Se não é período, mas tem uma data específica, adiciona na query da rota comum
+    if (params.data) {
+      query.set('data', params.data);
+    }
+    return request<PedidoReserva[]>(`/pedidos/filtrar?${query.toString()}`);
+  },
+  filtrarPorDia: (data: string) => {
+    return request<PedidoReserva[]>(`/pedidos/filtrar?data=${data}`);
+  },
+  filtrarPorPeriodo: (dataInicio: string, dataFim: string) => {
+    return request<PedidoReserva[]>(`/pedidos/filtrar/periodo?dataInicio=${dataInicio}&dataFim=${dataFim}`);
+  },
 };
 
 // ─── Usuários ─────────────────────────────────────────────────────────────────

@@ -102,7 +102,9 @@ export interface PedidoReserva {
   observacao?: string;
   reservasComputador: ReservaComputador[];
   reservasSala: ReservaSala[];
+  naJanelaCheckin?: boolean;
 }
+
 
 // ─── DTOs ────────────────────────────────────────────────────────────────────
 
@@ -150,8 +152,6 @@ export interface SalaDTO {
   nome: string;
   capacidadePessoas: number;
 }
-
-
 
 export interface PedidoReservaDTO {
   tipo: TipoPedido;

@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { usuarios as usuariosApi, auth } from '@/lib/api';
 import { Usuario } from '@/types';
-import { formatDate } from '@/lib/utils';
-import { maskCpf, maskTel } from '@/lib/utils';
+import { formatDate, maskCpf, maskTel } from '@/lib/utils';
 import { Modal } from '@/app/components/ui/Modal';
 import { Alert } from '@/app/components/ui/ErrorAlert';
 import { ActiveBadge } from '@/app/components/ui/ActiveBadge';
@@ -31,8 +30,7 @@ interface Stats {
 
 const emptyForm = (): CadastroForm => ({ nome: '', email: '', cpf: '', telefone: '', senha: '' });
 
-
-// ─── Modal de detalhes do usuário ─────────────────────────────────────────────
+// ─── MODAL DE DETALHES ────────────────────────────────────────────────────────
 function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
   usuario: Usuario;
   onClose: () => void;
@@ -46,7 +44,7 @@ function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-[var(--text-muted)]">E-mail</span>
-            <span className="font-medium text-[var(--text-primary)]">{usuario.email}</span>
+            <span className="font-medium text-[var(--text-primary)] break-all ml-2">{usuario.email}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-[var(--text-muted)]">CPF</span>
@@ -73,12 +71,14 @@ function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
             {usuario.ativo ? (
               <>
                 <button
+                  type="button"
                   onClick={onEditar}
                   className="flex-1 h-10 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors"
                 >
                   Editar
                 </button>
                 <button
+                  type="button"
                   onClick={onDesativar}
                   className="flex-1 h-10 rounded-lg border border-rose-300 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:text-rose-400 dark:hover:bg-rose-900/20 transition-colors"
                 >
@@ -87,6 +87,7 @@ function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
               </>
             ) : (
               <button
+                type="button"
                 onClick={onAtivar}
                 className="w-full h-10 rounded-lg border border-emerald-300 text-sm font-medium text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 transition-colors"
               >
@@ -100,11 +101,11 @@ function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
   );
 }
 
-// ─── Modal de edição do usuário ───────────────────────────────────────────────
+// ─── MODAL DE EDIÇÃO ──────────────────────────────────────────────────────────
 function EditarModal({ usuario, onClose, onSucesso }: {
   usuario: Usuario;
   onClose: () => void;
-  onSucesso: () => Promise<void>;
+  onSucesso: (usuarioAtualizado: Usuario) => Promise<void>;
 }) {
   const [form, setForm] = useState({
     nome: usuario.nome,
@@ -122,18 +123,23 @@ function EditarModal({ usuario, onClose, onSucesso }: {
     setError('');
     setSaving(true);
     try {
-      await usuariosApi.atualizar(usuario.id, {
+      const payload = {
         nome: form.nome,
         email: form.email,
         cpf: form.cpf.replace(/\D/g, ''),
         telefone: form.telefone ? form.telefone.replace(/\D/g, '') : undefined,
-      });
-      await onSucesso();
-      onClose();
+      };
+      
+      await usuariosApi.atualizar(usuario.id, payload);
+      
+      // Mescla os dados antigos com os novos para atualizar o modal de detalhes
+      const usuarioAtualizado: Usuario = { ...usuario, ...payload };
+      await onSucesso(usuarioAtualizado);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao salvar');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   return (
@@ -152,7 +158,7 @@ function EditarModal({ usuario, onClose, onSucesso }: {
           <div>
             <label className="label">Telefone</label>
             <input className="input-field" value={form.telefone}
-              onChange={e => set('telefone', maskTel(e.target.value))} />
+              onChange={e => set('telefone', maskTel(e.target.value))} maxLength={15} />
           </div>
         </div>
         <div>
@@ -162,7 +168,7 @@ function EditarModal({ usuario, onClose, onSucesso }: {
         </div>
         <Alert message={error} />
         <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+          <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
           <SaveButton saving={saving} onClick={handleSalvar} />
         </div>
       </div>
@@ -170,7 +176,7 @@ function EditarModal({ usuario, onClose, onSucesso }: {
   );
 }
 
-// ─── Modal de cadastro ────────────────────────────────────────────────────────
+// ─── MODAL DE CADASTRO ────────────────────────────────────────────────────────
 function CadastroModal({ onClose, onSucesso }: { onClose: () => void; onSucesso: () => void }) {
   const [form, setForm] = useState<CadastroForm>(emptyForm());
   const [saving, setSaving] = useState(false);
@@ -195,8 +201,9 @@ function CadastroModal({ onClose, onSucesso }: { onClose: () => void; onSucesso:
       onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao cadastrar');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   return (
@@ -216,7 +223,7 @@ function CadastroModal({ onClose, onSucesso }: { onClose: () => void; onSucesso:
           <div>
             <label className="label">Telefone</label>
             <input className="input-field" placeholder="(00) 00000-0000"
-              value={form.telefone} onChange={e => set('telefone', maskTel(e.target.value))} />
+              value={form.telefone} onChange={e => set('telefone', maskTel(e.target.value))} maxLength={15} />
           </div>
         </div>
         <div>
@@ -239,7 +246,7 @@ function CadastroModal({ onClose, onSucesso }: { onClose: () => void; onSucesso:
   );
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────────
+// ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 type ModalState =
   | { tipo: 'detalhes'; usuario: Usuario }
   | { tipo: 'editar'; usuario: Usuario }
@@ -254,41 +261,36 @@ export default function UsuariosAdminPage() {
   const [modal, setModal] = useState<ModalState>(null);
   const { openConfirm, confirmModal } = useConfirm();
 
-  // Carrega stats ao montar
-  useEffect(() => {
-    usuariosApi.stats().then(setStats).catch(console.error);
-  }, []);
-
-  // Busca usuários conforme pesquisa
-  useEffect(() => {
-    if (!search.trim()) { setList([]); return; }
-
-    const timeout = setTimeout(async () => {
-      setLoading(true);
-      try {
-        setList(await usuariosApi.buscarPorTermo(search.trim()));
-      } catch (err) {
-        console.error('Erro ao buscar usuários:', err);
-      }
-      setLoading(false);
-    }, 350); // debounce
-
-    return () => clearTimeout(timeout);
-  }, [search]);
-
-  const refreshBusca = async () => {
-    if (search.trim()) {
-      setLoading(true);
-      try {
-        setList(await usuariosApi.buscarPorTermo(search.trim()));
-      } catch (err) {
-        console.error(err);
-      }
+  // Função encapsulada em useCallback para evitar loops de renderização
+  const fetchUsuarios = useCallback(async (termoBusca: string) => {
+    setLoading(true);
+    try {
+      // Se não houver termo, você pode chamar um usuariosApi.listarTodos() se o seu back-end aceitar
+      const dados = termoBusca.trim() 
+        ? await usuariosApi.buscarPorTermo(termoBusca.trim())
+        : await usuariosApi.buscarPorTermo(""); // Ou api de listagem geral
+      setList(dados);
+    } catch (err) {
+      console.error('Erro ao buscar usuários:', err);
+    } finally {
       setLoading(false);
     }
-    // Atualiza stats também
+  }, []);
+
+  // Carrega estatísticas iniciais
+  useEffect(() => {
     usuariosApi.stats().then(setStats).catch(console.error);
-  };
+    fetchUsuarios(''); // Busca inicial sem filtros ao montar o componente
+  }, [fetchUsuarios]);
+
+  // Efeito do Debounce para a barra de pesquisa
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      fetchUsuarios(search);
+    }, 350);
+
+    return () => clearTimeout(timeout);
+  }, [search, fetchUsuarios]);
 
   const handleDesativar = (u: Usuario) => {
     openConfirm({
@@ -298,7 +300,7 @@ export default function UsuariosAdminPage() {
       confirmStyle: 'danger',
       onConfirm: async () => {
         await usuariosApi.deletar(u.id);
-        await refreshBusca();
+        await fetchUsuarios(search);
         setModal(null);
       },
     });
@@ -312,7 +314,7 @@ export default function UsuariosAdminPage() {
       confirmStyle: 'success',
       onConfirm: async () => {
         await usuariosApi.ativar(u.id);
-        await refreshBusca();
+        await fetchUsuarios(search);
         setModal(null);
       },
     });
@@ -339,12 +341,8 @@ export default function UsuariosAdminPage() {
 
       {loading ? (
         <LoadingList items={3} />
-      ) : !search.trim() ? (
-        <div className="card p-12 text-center">
-          <p className="text-[var(--text-secondary)]">Digite o nome, email ou CPF para buscar por um usuário</p>
-        </div>
       ) : list.length === 0 ? (
-        <EmptyState message="Nenhum usuário encontrado" />
+        <EmptyState message={search.trim() ? "Nenhum usuário encontrado" : "Nenhum usuário cadastrado no sistema"} />
       ) : (
         <div className="card divide-y divide-[var(--border)]">
           {list.map(u => (
@@ -352,13 +350,13 @@ export default function UsuariosAdminPage() {
               className={`flex items-center justify-between px-5 py-4 gap-3 cursor-pointer hover:bg-[var(--surface-2)] transition-colors ${!u.ativo ? 'opacity-50' : ''}`}>
 
               <div className="flex items-start gap-8 min-w-0 flex-1">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-[var(--text-muted)]">Nome</p>
                   <p className="text-sm font-semibold text-[var(--text-primary)] break-words leading-snug">
                     {u.nome}
                   </p>
                 </div>
-                <div className="shrink-0">
+                <div className="shrink-0 w-32 hidden sm:block">
                   <p className="text-xs text-[var(--text-muted)]">CPF</p>
                   <p className="text-sm font-mono text-[var(--text-secondary)]">
                     {maskCpf(u.cpf)}
@@ -383,7 +381,7 @@ export default function UsuariosAdminPage() {
       {modal?.tipo === 'cadastro' && (
         <CadastroModal
           onClose={() => setModal(null)}
-          onSucesso={() => { refreshBusca(); setModal(null); }}
+          onSucesso={() => { fetchUsuarios(search); }}
         />
       )}
 
@@ -401,7 +399,11 @@ export default function UsuariosAdminPage() {
         <EditarModal
           usuario={modal.usuario}
           onClose={() => setModal({ tipo: 'detalhes', usuario: modal.usuario })}
-          onSucesso={refreshBusca}
+          onSucesso={async (usuarioAtualizado) => {
+            await fetchUsuarios(search);
+            // Reabre o modal de detalhes já com as informações alteradas!
+            setModal({ tipo: 'detalhes', usuario: usuarioAtualizado });
+          }}
         />
       )}
 

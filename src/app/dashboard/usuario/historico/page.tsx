@@ -1,129 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { pedidos as pedidosApi } from '@/lib/api';
 import { PedidoReserva } from '@/types';
-import { formatDate, formatTime } from '@/lib/utils';
-import { StatusBadge } from '@/app/components/ui/StatusBadge';
-import { CheckinCheckoutInfo } from '@/app/components/ui/CheckinCheckoutInfo';
+import { HistoricoCard, HistoricoModal } from '@/app/components/usuario/HistoricoComponents';
 
 const STATUS_ENCERRADOS = ['FINALIZADA', 'CANCELADA', 'ATRASADO', 'REJEITADA'];
-
-function formatHora(iso: string) {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function HistoricoModal({ pedido, onClose }: { pedido: PedidoReserva; onClose: () => void }) {
-  const isPc = pedido.tipo === 'COMPUTADOR';
-  const itens = isPc
-    ? pedido.reservasComputador?.map(r => r.computador?.codigo ?? '—') ?? []
-    : pedido.reservasSala?.map(r => r.sala?.nome ?? '—') ?? [];
-  const primeiraReserva = isPc
-    ? pedido.reservasComputador?.[0]
-    : pedido.reservasSala?.[0];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-[#161b22] rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
-
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <div className="flex items-center gap-2">
-            <span className={`text-xs font-bold px-2 py-0.5 rounded ${isPc
-              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-              : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
-              {isPc ? 'COMPUTADOR' : 'SALA'}
-            </span>
-            <StatusBadge status={pedido.status} />
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)]">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="overflow-y-auto flex-1 p-6 space-y-4">
-          <div>
-            <p className="text-xs text-[var(--text-muted)] mb-2">{isPc ? 'Computadores' : 'Salas'}</p>
-            <div className="flex flex-wrap gap-2">
-              {itens.map((item, i) => (
-                <span key={i} className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${isPc
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-mono'
-                  : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'}`}>
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{formatDate(pedido.inicioPrevisto)}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Horário</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Pessoas</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.qtdePessoas}</p>
-            </div>
-            {pedido.observacao && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">Observação</p>
-                <p className="text-sm text-[var(--text-secondary)] truncate">{pedido.observacao}</p>
-              </div>
-            )}
-          </div>
-
-          <CheckinCheckoutInfo
-            checkinEm={primeiraReserva?.checkinEm}
-            checkoutEm={primeiraReserva?.checkoutEm}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HistoricoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () => void }) {
-  const isPc = pedido.tipo === 'COMPUTADOR';
-  const qtd = isPc ? pedido.reservasComputador?.length ?? 0 : pedido.reservasSala?.length ?? 0;
-  const labelItem = isPc
-    ? `${qtd} computador${qtd !== 1 ? 'es' : ''}`
-    : `${qtd} sala${qtd !== 1 ? 's' : ''}`;
-
-  return (
-    <div onClick={onClick}
-      className="px-5 py-4 cursor-pointer hover:bg-[var(--surface-2)] transition-colors opacity-70">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${isPc
-              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-              : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
-              {isPc ? 'PC' : 'SALA'}
-            </span>
-            <p className="text-sm font-medium text-[var(--text-primary)]">{labelItem}</p>
-          </div>
-          <p className="text-xs text-[var(--text-muted)]">
-            {formatDate(pedido.inicioPrevisto)} · {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <StatusBadge status={pedido.status} />
-          <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function HistoricoPage() {
   const [historico, setHistorico] = useState<PedidoReserva[]>([]);
@@ -131,8 +13,13 @@ export default function HistoricoPage() {
   const [selecionado, setSelecionado] = useState<PedidoReserva | null>(null);
   const [erro, setErro] = useState('');
 
+  // Estados dos Filtros Estilizados
+  const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'COMPUTADOR' | 'SALA'>('TODOS');
+  const [filtroData, setFiltroData] = useState('');
+
   const fetchHistorico = useCallback(async () => {
     try {
+      setLoading(true);
       const lista = await pedidosApi.meus();
       setHistorico(
         lista
@@ -142,43 +29,121 @@ export default function HistoricoPage() {
     } catch (err) {
       console.error(err);
       setErro('Não foi possível carregar o histórico. Tente recarregar.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, []);
 
-  useEffect(() => { fetchHistorico(); }, [fetchHistorico]);
+  useEffect(() => { 
+    fetchHistorico(); 
+  }, [fetchHistorico]);
+
+  const historicoFiltrado = useMemo(() => {
+    return historico.filter(p => {
+      const passaTipo = filtroTipo === 'TODOS' || p.tipo === filtroTipo;
+      let passaData = true;
+      if (filtroData) {
+        const dataPedido = p.inicioPrevisto.split('T')[0];
+        passaData = dataPedido === filtroData;
+      }
+      return passaTipo && passaData;
+    });
+  }, [historico, filtroTipo, filtroData]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="page-title">Histórico</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-1">
-          {historico.length} reserva{historico.length !== 1 ? 's' : ''} encerrada{historico.length !== 1 ? 's' : ''}
-        </p>
+      {/* HEADER DA TELA */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="page-title">Histórico</h1>
+        </div>
+
+        {/* FILTRO DE DATA ESTILIZADO (CALENDÁRIO) */}
+        <div className="relative shrink-0 w-full sm:w-auto">
+          <input 
+            type="date" 
+            value={filtroData}
+            onChange={e => setFiltroData(e.target.value)}
+            className="input-field w-full sm:w-44 pr-8 bg-[var(--surface)] text-sm font-medium cursor-pointer transition-colors hover:border-[var(--border-hover)]"
+          />
+          {filtroData && (
+            <button 
+              type="button"
+              onClick={() => setFiltroData('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-rose-500 transition-colors p-1"
+              title="Limpar data"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* BOTÕES DE FILTRO EM CIMA (SEGMENTED CONTROL) */}
+      <div className="flex p-1 bg-[var(--surface-2)] rounded-xl border border-[var(--border)] max-w-sm">
+        <button
+          type="button"
+          onClick={() => setFiltroTipo('TODOS')}
+          className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${
+            filtroTipo === 'TODOS'
+              ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+          }`}
+        >
+          Todos
+        </button>
+        <button
+          type="button"
+          onClick={() => setFiltroTipo('COMPUTADOR')}
+          className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${
+            filtroTipo === 'COMPUTADOR'
+              ? 'bg-blue-600 text-white shadow-sm dark:bg-blue-700'
+              : 'text-[var(--text-muted)] hover:text-blue-500'
+          }`}
+        >
+          Computadores
+        </button>
+        <button
+          type="button"
+          onClick={() => setFiltroTipo('SALA')}
+          className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${
+            filtroTipo === 'SALA'
+              ? 'bg-violet-600 text-white shadow-sm dark:bg-violet-700'
+              : 'text-[var(--text-muted)] hover:text-violet-500'
+          }`}
+        >
+          Salas
+        </button>
       </div>
 
       {erro && (
-        <div className="p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-sm text-rose-700 dark:text-rose-300">
+        <div className="p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl text-sm text-rose-700 dark:text-rose-300">
           {erro}
         </div>
       )}
 
+      {/* LISTAGEM PRINCIPAL */}
       {loading ? (
         <div className="card divide-y divide-[var(--border)]">
           {[1, 2, 3].map(i => <div key={i} className="h-16 shimmer" />)}
         </div>
-      ) : historico.length === 0 ? (
-        <div className="card p-12 text-center">
+      ) : historicoFiltrado.length === 0 ? (
+        <div className="card p-12 text-center border-dashed">
           <svg className="w-10 h-10 text-[var(--text-muted)] mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <p className="text-[var(--text-secondary)] font-medium">Nenhuma reserva no histórico</p>
-          <p className="text-sm text-[var(--text-muted)] mt-1">As reservas finalizadas, canceladas e atrasadas aparecerão aqui.</p>
+          <p className="text-[var(--text-secondary)] font-medium">Nenhum resultado encontrado</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">
+            {historico.length === 0 
+              ? 'Você ainda não possui reservas finalizadas.' 
+              : 'Nenhum registro corresponde aos filtros selecionados.'}
+          </p>
         </div>
       ) : (
-        <div className="card divide-y divide-[var(--border)] overflow-hidden">
-          {historico.map(p => (
+        <div className="card divide-y divide-[var(--border)] overflow-hidden shadow-sm">
+          {historicoFiltrado.map(p => (
             <HistoricoCard key={p.id} pedido={p} onClick={() => setSelecionado(p)} />
           ))}
         </div>

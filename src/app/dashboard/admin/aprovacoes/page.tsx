@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { aprovacoes as aprovacaoApi } from '@/lib/api';
+import { useEffect, useState, useMemo } from 'react';
+// Importamos pedidos para usar a nova busca inteligente do servidor
+import { aprovacoes as aprovacaoApi, pedidos as pedidosApi } from '@/lib/api';
 import { AprovacaoReserva } from '@/types';
-import { formatDate } from '@/lib/utils';
-import { maskCpf, maskTel } from '@/lib/utils';
+import { formatDate, maskCpf, maskTel } from '@/lib/utils';
 import { Alert } from '@/app/components/ui/ErrorAlert';
 import { LoadingList } from '@/app/components/ui/LoadingList';
 import { EmptyState } from '@/app/components/ui/EmptyState';
@@ -41,13 +41,12 @@ function DetalheModal({ ap, onClose, onDecisao }: {
       onClose();
     } catch (e: unknown) {
       console.error('Erro ao processar aprovação:', e);
-      setError(e instanceof Error ? e.message : 'Erro');
+      setError(e instanceof Error ? e.message : 'Erro ao processar decisão');
       setActing(null);
     }
   };
 
   return (
-
     <Modal
       title={
         <span className={`text-xs font-bold px-2 py-0.5 rounded ${isPC
@@ -59,8 +58,6 @@ function DetalheModal({ ap, onClose, onDecisao }: {
       onClose={onClose}
     >
       <div className="space-y-4">
-
-
         {/* Itens */}
         <div>
           <p className="text-xs text-[var(--text-muted)] mb-2">{isPC ? 'Computadores' : 'Salas'}</p>
@@ -76,14 +73,14 @@ function DetalheModal({ ap, onClose, onDecisao }: {
         </div>
 
         {/* Dados do usuário */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="p-3 rounded-xl bg-[var(--surface-2)]">
             <p className="text-xs text-[var(--text-muted)] mb-1">Nome</p>
             <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.usuario.nome}</p>
           </div>
           <div className="p-3 rounded-xl bg-[var(--surface-2)]">
             <p className="text-xs text-[var(--text-muted)] mb-1">E-mail</p>
-            <p className="text-xs text-[var(--text-muted)]">{pedido.usuario.email}</p>
+            <p className="text-xs text-[var(--text-muted)] truncate">{pedido.usuario.email}</p>
           </div>
           {pedido.usuario.cpf && (
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
@@ -95,12 +92,11 @@ function DetalheModal({ ap, onClose, onDecisao }: {
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
               <p className="text-xs text-[var(--text-muted)] mb-1">Telefone</p>
               <p className="text-xs text-[var(--text-muted)]">{maskTel(pedido.usuario.telefone)}</p>
-
             </div>
           )}
         </div>
 
-        {/* Data, horário, pessoas, solicitado, obs */}
+        {/* Detalhes do horário */}
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 rounded-xl bg-[var(--surface-2)]">
             <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
@@ -127,18 +123,18 @@ function DetalheModal({ ap, onClose, onDecisao }: {
         </div>
 
         {pedido.observacao && (
-          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+          <div className="p-3 rounded-xl bg-[var(--surface-2)] break-words">
             <p className="text-xs text-[var(--text-muted)] mb-1">Observação</p>
-            <p className="text-sm text-[var(--text-secondary)]">{pedido.observacao}</p>
+            <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{pedido.observacao}</p>
           </div>
         )}
 
-        {/* Motivo + botoes */}
+        {/* Decisão */}
         <div className="space-y-3 pt-2 border-t border-[var(--border)]">
           <input
             type="text"
             className="input-field"
-            placeholder="Motivo (opcional)"
+            placeholder="Motivo da decisão administrativo (opcional)"
             value={motivo}
             onChange={e => setMotivo(e.target.value)}
           />
@@ -146,7 +142,7 @@ function DetalheModal({ ap, onClose, onDecisao }: {
             <button
               onClick={() => handle('rejeitar')}
               disabled={!!acting}
-              className="btn-danger flex-1 flex items-center justify-center gap-2"
+              className="btn-danger flex-1 h-10 flex items-center justify-center gap-2"
             >
               {acting === 'rejeitar'
                 ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -156,7 +152,7 @@ function DetalheModal({ ap, onClose, onDecisao }: {
             <button
               onClick={() => handle('aprovar')}
               disabled={!!acting}
-              className="btn-success flex-1 flex items-center justify-center gap-2"
+              className="btn-success flex-1 h-10 flex items-center justify-center gap-2"
             >
               {acting === 'aprovar'
                 ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -168,17 +164,13 @@ function DetalheModal({ ap, onClose, onDecisao }: {
 
         <Alert message={error} />
       </div>
-    </Modal >
-
+    </Modal>
   );
 }
 
 // ─── Card de aprovação ────────────────────────────────────────────────────────
 
-function AprovacaoCard({ ap, onClick }: {
-  ap: AprovacaoReserva;
-  onClick: () => void;
-}) {
+function AprovacaoCard({ ap, onClick }: { ap: AprovacaoReserva; onClick: () => void }) {
   const pedido = ap.pedido;
   const isPC = pedido.tipo === 'COMPUTADOR';
   const itens = isPC
@@ -194,7 +186,6 @@ function AprovacaoCard({ ap, onClick }: {
       className="px-5 py-4 cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
     >
       <div className="flex items-center justify-between gap-3">
-        {/* Esquerda */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${isPC
@@ -208,11 +199,10 @@ function AprovacaoCard({ ap, onClick }: {
           </div>
           <p className="text-xs text-[var(--text-muted)] truncate">{itens}</p>
           <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">
-            {pedido.usuario.nome} · {pedido.usuario.email}
+            {pedido.usuario.nome} · <span className="font-mono">{pedido.usuario.email}</span>
           </p>
         </div>
 
-        {/* Centro — horário e data */}
         <div className="shrink-0 text-center hidden sm:block">
           <p className="text-sm font-semibold text-[var(--text-primary)]">
             {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
@@ -222,7 +212,6 @@ function AprovacaoCard({ ap, onClick }: {
           </p>
         </div>
 
-        {/* Direita */}
         <svg className="w-4 h-4 text-[var(--text-muted)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
@@ -237,19 +226,39 @@ export default function AprovacoesPage() {
   const [list, setList] = useState<AprovacaoReserva[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>('todos');
+  const [search, setSearch] = useState(''); // <-- Novo estado para a busca por texto
   const [selecionada, setSelecionada] = useState<AprovacaoReserva | null>(null);
 
   const loadList = async () => {
     setLoading(true);
     try {
-      setList(await aprovacaoApi.pendentes());
+      // 1. Buscamos os pedidos filtrados direto do back-end (Ignorando datas, focando no status e no texto)
+      const pedidosPendentes = await pedidosApi.filtrar({
+        status: 'PENDENTE_APROVACAO',
+        busca: search.trim() || undefined
+      });
+
+      // 2. Buscamos a lista base de aprovações do sistema
+      const aprovacoesPendentes = await aprovacaoApi.pendentes();
+
+      // Cruzamos os dados para garantir que só listamos os objetos 'AprovacaoReserva' 
+      // cujo Pedido passou no filtro de busca por texto do servidor
+      const listaFiltradaPeloBanco = aprovacoesPendentes.filter(ap => 
+        pedidosPendentes.some(p => p.id === ap.pedido.id)
+      );
+
+      setList(listaFiltradaPeloBanco);
     } catch (err) {
       console.error('Erro ao carregar aprovações:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  useEffect(() => { loadList(); }, []);
+  // Dispara a busca no banco sempre que o usuário digitar na busca
+  useEffect(() => { 
+    loadList(); 
+  }, [search]);
 
   const handleDecisao = async (id: number, acao: 'aprovar' | 'rejeitar', motivo?: string) => {
     if (acao === 'aprovar') await aprovacaoApi.aprovar(id, motivo);
@@ -257,63 +266,77 @@ export default function AprovacoesPage() {
     await loadList();
   };
 
-  const pcCount = list.filter(ap => ap.pedido.tipo === 'COMPUTADOR').length;
-  const salaCount = list.filter(ap => ap.pedido.tipo === 'SALA').length;
+  const { pcCount, salaCount } = useMemo(() => {
+    return {
+      pcCount: list.filter(ap => ap.pedido.tipo === 'COMPUTADOR').length,
+      salaCount: list.filter(ap => ap.pedido.tipo === 'SALA').length
+    };
+  }, [list]);
 
-  const listFiltrada = list.filter(ap =>
-    filtroTipo === 'todos' || ap.pedido.tipo === filtroTipo
-  );
+  const listFiltrada = useMemo(() => {
+    return list.filter(ap => filtroTipo === 'todos' || ap.pedido.tipo === filtroTipo);
+  }, [list, filtroTipo]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-
       {/* Header */}
       <div>
         <h1 className="page-title">Aprovações Pendentes</h1>
+        <p className="text-xs text-[var(--text-muted)] mt-1">
+          Histórico total de solicitações aguardando sua decisão administrativa.
+        </p>
       </div>
 
-      {/* Filtros */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setFiltroTipo('todos')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filtroTipo === 'todos'
-            ? 'bg-blue-600 text-white'
-            : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]'}`}
-        >
-          Todos ({list.length})
-        </button>
-        <button
-          onClick={() => setFiltroTipo('COMPUTADOR')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filtroTipo === 'COMPUTADOR'
-            ? 'bg-blue-600 text-white'
-            : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]'}`}
-        >
-          Computadores ({pcCount})
-        </button>
-        <button
-          onClick={() => setFiltroTipo('SALA')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filtroTipo === 'SALA'
-            ? 'bg-violet-600 text-white'
-            : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]'}`}
-        >
-          Salas ({salaCount})
-        </button>
+      {/* Filtros e Barra de Pesquisa */}
+      <div className="space-y-3">
+        <input 
+          type="text"
+          placeholder="Buscar pendentes por usuário, e-mail, PC ou sala..."
+          value={search} 
+          onChange={e => setSearch(e.target.value)}
+          className="input-field w-full sm:max-w-md" 
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setFiltroTipo('todos')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filtroTipo === 'todos'
+              ? 'bg-violet-600 text-white'
+              : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]'}`}
+          >
+            Todos ({list.length})
+          </button>
+          <button
+            onClick={() => setFiltroTipo('COMPUTADOR')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filtroTipo === 'COMPUTADOR'
+              ? 'bg-violet-600 text-white'
+              : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]'}`}
+          >
+            Computadores ({pcCount})
+          </button>
+          <button
+            onClick={() => setFiltroTipo('SALA')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filtroTipo === 'SALA'
+              ? 'bg-violet-600 text-white'
+              : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]'}`}
+          >
+            Salas ({salaCount})
+          </button>
+        </div>
       </div>
 
       {/* Lista */}
       {loading ? (
-        <div className="space-y-3">
-          <LoadingList items={3} height="h-20" />
-        </div>
+        <LoadingList items={3} height="h-20" />
       ) : listFiltrada.length === 0 ? (
-        <EmptyState message={list.length === 0 ? 'Nenhuma reserva aguardando aprovação' : 'Nenhuma aprovação nesta categoria'} />
+        <EmptyState message={search ? "Nenhum pedido pendente corresponde à busca" : "Nenhuma reserva aguardando aprovação"} />
       ) : (
-        <div className="card divide-y divide-[var(--border)]">
+        <div className="card divide-y divide-[var(--border)] overflow-hidden">
           {listFiltrada.map(ap => (
             <AprovacaoCard key={ap.id} ap={ap} onClick={() => setSelecionada(ap)} />
           ))}
-          <div className="px-5 py-2 text-xs text-[var(--text-muted)]">
-            {listFiltrada.length} pendente{listFiltrada.length !== 1 ? 's' : ''}
+          <div className="px-5 py-2.5 bg-[var(--bg-muted)]/10 text-xs text-[var(--text-muted)] font-medium">
+            Mostrando {listFiltrada.length} pedido{listFiltrada.length !== 1 ? 's' : ''} encontrado{listFiltrada.length !== 1 ? 's' : ''}
           </div>
         </div>
       )}

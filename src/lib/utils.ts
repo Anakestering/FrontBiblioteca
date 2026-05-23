@@ -96,3 +96,70 @@ export function toDatetimeLocal(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+
+export const DURACAO = 45;
+export const HORA_INICIO = 7;
+export const HORA_FIM = 22;
+
+export function addMin(date: Date, min: number) {
+  return new Date(date.getTime() + min * 60000);
+}
+
+export function formatHora(date: Date) {
+  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function toISOLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+}
+
+export function gerarBlocos(dia: Date): Date[] {
+  const blocos: Date[] = [];
+  const cursor = new Date(dia);
+  cursor.setHours(HORA_INICIO, 0, 0, 0);
+  const limite = new Date(dia);
+  limite.setHours(HORA_FIM, 0, 0, 0);
+  while (addMin(cursor, DURACAO) <= limite) {
+    blocos.push(new Date(cursor));
+    cursor.setMinutes(cursor.getMinutes() + DURACAO);
+  }
+  return blocos;
+}
+
+export function agruparConsecutivos(blocos: Date[]): { inicio: Date; fim: Date; qtd: number }[] {
+  if (!blocos.length) return [];
+  const sorted = [...blocos].sort((a, b) => a.getTime() - b.getTime());
+  const grupos: { inicio: Date; fim: Date; qtd: number }[] = [];
+  for (const bloco of sorted) {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && bloco.getTime() === ultimo.fim.getTime()) {
+      ultimo.fim = addMin(bloco, DURACAO);
+      ultimo.qtd++;
+    } else {
+      grupos.push({ inicio: bloco, fim: addMin(bloco, DURACAO), qtd: 1 });
+    }
+  }
+  return grupos;
+}
+
+export function maiorSequencia(blocos: Date[]): number {
+  if (!blocos.length) return 0;
+  const sorted = [...blocos].sort((a, b) => a.getTime() - b.getTime());
+  let max = 1, atual = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    if ((sorted[i].getTime() - sorted[i - 1].getTime()) / 60000 === DURACAO) {
+      max = Math.max(max, ++atual);
+    } else {
+      atual = 1;
+    }
+  }
+  return max;
+}
+
+export function saoConsecutivos(blocos: Date[]): boolean {
+  if (blocos.length <= 1) return true;
+  const grupos = agruparConsecutivos(blocos);
+  return grupos.length === 1;
+}

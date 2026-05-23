@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { computadores as computadoresApi } from '@/lib/api';
 import { Computador, ComputadorDTO } from '@/types';
 import { Modal } from '@/app/components/ui/Modal';
@@ -163,13 +163,22 @@ export default function GerenciarComputadoresPage() {
     setSaving(false);
   };
 
-  const filtered = list.filter(p =>
-    !search ||
-    p.codigo.toLowerCase().includes(search.toLowerCase()) ||
-    (p.observacao ?? '').toLowerCase().includes(search.toLowerCase())
-  );
-  const ativos = filtered.filter(p => p.ativo);
-  const inativos = filtered.filter(p => !p.ativo);
+  
+  const { ativos, inativos, filtered } = useMemo(() => {
+    const LowerSearch = search.toLowerCase().trim();
+    const listaFiltrada = list.filter(p =>
+      !LowerSearch ||
+      p.codigo.toLowerCase().includes(LowerSearch) ||
+      (p.observacao ?? '').toLowerCase().includes(LowerSearch)
+    );
+    
+    return {
+      filtered: listaFiltrada,
+      ativos: listaFiltrada.filter(p => p.ativo),
+      inativos: listaFiltrada.filter(p => !p.ativo)
+    };
+  }, [list, search]);
+
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -239,22 +248,32 @@ export default function GerenciarComputadoresPage() {
       {/* Modal criar/editar */}
       {(modal?.tipo === 'criar' || modal?.tipo === 'editar') && (
         <Modal
-          title={modal.tipo === 'criar' ? 'Novo Computador' : `Editar — ${(modal as { tipo: 'editar'; pc: Computador }).pc.codigo}`}
+          title={modal.tipo === 'criar' ? 'Novo Computador' : `Editar — ${modal.pc.codigo}`}
           onClose={() => setModal(null)}
         >
           <div className="space-y-4">
             <div>
               <label className="label">Código do computador</label>
-              <input type="text" className="input-field font-mono" placeholder="Ex: PC-01"
-                value={form.codigo} onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))} />
+              <input 
+                type="text" 
+                className="input-field font-mono" 
+                placeholder="Ex: PC-01"
+                value={form.codigo} 
+                onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))} 
+              />
             </div>
 
             <div>
               <label className="label">Capacidade (máx. 2 pessoas)</label>
               <div className="flex items-center gap-3">
-                <input type="range" min={1} max={2} value={form.capacidadePessoas}
+                <input 
+                  type="range" 
+                  min={1} 
+                  max={2} 
+                  value={form.capacidadePessoas}
                   onChange={e => setForm(f => ({ ...f, capacidadePessoas: Number(e.target.value) }))}
-                  className="flex-1 accent-blue-600" />
+                  className="flex-1 accent-blue-600" 
+                />
                 <span className="w-8 text-center font-bold text-[var(--text-primary)]">{form.capacidadePessoas}</span>
               </div>
             </div>
@@ -276,8 +295,13 @@ export default function GerenciarComputadoresPage() {
             <Alert message={error} />
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setModal(null)} className="btn-secondary flex-1">Cancelar</button>
-              <SaveButton saving={saving} onClick={handleSave} disabled={!form.codigo.trim()} />
+              <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">Cancelar</button>
+              {/* Proteção com Fallback para string idônea no trim() */}
+              <SaveButton 
+                saving={saving} 
+                onClick={handleSave} 
+                disabled={!(form.codigo ?? '').trim() || saving} 
+              />
             </div>
           </div>
         </Modal>

@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { salas as salasApi } from '@/lib/api';
 import { Sala, SalaDTO } from '@/types';
 import { Modal } from '@/app/components/ui/Modal';
@@ -13,19 +14,16 @@ import { SearchInput } from '@/app/components/ui/SearchInput';
 import { PageHeader } from '@/app/components/ui/PageHeader';
 import { useConfirm } from '@/app/hooks/useConfirm';
 
+type ModalState =
+  | { tipo: 'criar' }
+  | { tipo: 'editar'; sala: Sala }
+  | null;
 
 export default function GerenciarSalasPage() {
   const [list, setList] = useState<Sala[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-
-  type ModalState =
-    | { tipo: 'criar' }
-    | { tipo: 'editar'; sala: Sala }
-    | null;
-
   const [modal, setModal] = useState<ModalState>(null);
-
   const [form, setForm] = useState<SalaDTO>({ nome: '', capacidadePessoas: 5 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -35,7 +33,9 @@ export default function GerenciarSalasPage() {
     setLoading(true);
     try {
       setList(await salasApi.listarTodas());
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error('Erro ao carregar salas:', err);
+    }
     setLoading(false);
   };
 
@@ -62,6 +62,7 @@ export default function GerenciarSalasPage() {
       await loadList();
       setModal(null);
     } catch (e: unknown) {
+      console.error('Erro ao salvar sala:', e);
       setError(e instanceof Error ? e.message : 'Erro ao salvar');
     }
     setSaving(false);
@@ -96,18 +97,25 @@ export default function GerenciarSalasPage() {
     });
   };
 
-  const filtered = list.filter(s =>
-    !search || s.nome.toLowerCase().includes(search.toLowerCase())
-  );
+  // ✅ OTIMIZAÇÃO: Filtros e contadores calculados de forma performática
+  const { ativos, inativas, filtered } = useMemo(() => {
+    const lowerSearch = search.toLowerCase().trim();
+    const listaFiltrada = list.filter(s =>
+      !lowerSearch || s.nome.toLowerCase().includes(lowerSearch)
+    );
 
-  const ativas = filtered.filter(s => s.ativo);
-  const inativas = filtered.filter(s => !s.ativo);
+    return {
+      filtered: listaFiltrada,
+      ativos: listaFiltrada.filter(s => s.ativo),
+      inativas: listaFiltrada.filter(s => !s.ativo)
+    };
+  }, [list, search]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <PageHeader
         title="Gerenciar Salas"
-        subtitle={`${ativas.length} ativa${ativas.length !== 1 ? 's' : ''} · ${inativas.length} inativa${inativas.length !== 1 ? 's' : ''}`}
+        subtitle={`${ativos.length} ativa${ativos.length !== 1 ? 's' : ''} · ${inativas.length} inativa${inativas.length !== 1 ? 's' : ''}`}
         buttonLabel="Nova Sala"
         onButtonClick={openCriar}
       />
@@ -120,38 +128,61 @@ export default function GerenciarSalasPage() {
         <EmptyState message="Nenhuma sala encontrada" />
       ) : (
         <div className="card divide-y divide-[var(--border)]">
-          {[...ativas, ...inativas].map(sala => (
+          {[...ativos, ...inativas].map(sala => (
             <div
               key={sala.id}
-              className={`flex items-center justify-between px-5 py-4 gap-3 transition-opacity ${!sala.ativo ? 'opacity-50' : ''
-                }`}
+              className={`flex items-center justify-between px-5 py-4 gap-3 transition-colors ${
+                !sala.ativo ? 'opacity-60 bg-[var(--bg-muted)]/20' : ''
+              }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
                   <span className="text-violet-600 dark:text-violet-400 text-lg">🏫</span>
                 </div>
-                <div>
-                  <p className="font-medium text-[var(--text-primary)]">{sala.nome}</p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Cap. {sala.capacidadePessoas} pessoas ·{' '}
+                <div className="min-w-0">
+                  <p className="font-medium text-[var(--text-primary)] truncate">{sala.nome}</p>
+                  <p className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
+                    <span>Cap. {sala.capacidadePessoas} pessoas</span>
+                    <span>·</span>
                     <ActiveBadge ativo={sala.ativo} genero="feminino" />
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1">
-                <button onClick={() => openEditar(sala)}>Editar</button>
-                <button onClick={() => handleToggle(sala)}>...</button>
-                <button onClick={() => handleDeletar(sala)}>Excluir</button>
+              {/* ✅ MELHORIA DE LAYOUT: Botões de ação elegantes na linha */}
+              <div className="flex items-center gap-2 shrink-0 text-xs font-medium">
+                <button 
+                  onClick={() => openEditar(sala)}
+                  className="px-2.5 py-1.5 rounded-md border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                >
+                  Editar
+                </button>
+                <button 
+                  onClick={() => handleToggle(sala)}
+                  className={`px-2.5 py-1.5 rounded-md border transition-colors ${
+                    sala.ativo 
+                      ? 'border-amber-200 text-amber-600 hover:bg-amber-50 dark:border-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-950/20' 
+                      : 'border-green-200 text-green-600 hover:bg-green-50 dark:border-green-900/30 dark:text-green-400 dark:hover:bg-green-950/20'
+                  }`}
+                >
+                  {sala.ativo ? 'Desativar' : 'Ativar'}
+                </button>
+                <button 
+                  onClick={() => handleDeletar(sala)}
+                  className="px-2.5 py-1.5 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-950/20 transition-colors"
+                >
+                  Excluir
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {modal !== null && (
+      {/* ✅ CORREÇÃO DE TIPAGEM: Sem typecast forçado no Modal */}
+      {(modal?.tipo === 'criar' || modal?.tipo === 'editar') && (
         <Modal
-          title={modal.tipo === 'criar' ? 'Nova Sala' : `Editar — ${(modal as { tipo: 'editar'; sala: Sala }).sala.nome}`}
+          title={modal.tipo === 'criar' ? 'Nova Sala' : `Editar — ${modal.sala.nome}`}
           onClose={() => setModal(null)}
         >
           <div className="space-y-4">
@@ -169,7 +200,9 @@ export default function GerenciarSalasPage() {
               <label className="label">Capacidade (máx. 5 pessoas)</label>
               <div className="flex items-center gap-3">
                 <input
-                  type="range" min={1} max={5}
+                  type="range" 
+                  min={1} 
+                  max={5}
                   value={form.capacidadePessoas}
                   onChange={e => setForm(f => ({ ...f, capacidadePessoas: Number(e.target.value) }))}
                   className="flex-1 accent-violet-600"
@@ -183,10 +216,15 @@ export default function GerenciarSalasPage() {
             <Alert message={error} />
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setModal(null)} className="btn-secondary flex-1">
+              <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">
                 Cancelar
               </button>
-              <SaveButton saving={saving} onClick={handleSave} disabled={!form.nome.trim()} />
+              {/* ✅ SEGURANÇA: Fallback de string segura no trim e trava durante loading */}
+              <SaveButton 
+                saving={saving} 
+                onClick={handleSave} 
+                disabled={!(form.nome ?? '').trim() || saving} 
+              />
             </div>
           </div>
         </Modal>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -13,8 +13,8 @@ import {
 import { PedidoReserva, AprovacaoReserva, Computador, Sala } from '@/types';
 import { formatDate, formatTime, maskCpf, maskTel } from '@/lib/utils';
 import { StatusBadge } from '@/app/components/ui/StatusBadge';
-import { CheckinCheckoutInfo } from '@/app/components/ui/CheckinCheckoutInfo';
 import { useRouter } from 'next/navigation';
+import { PedidoDetailModal } from '@/app/components/admin/PedidoDetailModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -35,235 +35,34 @@ function isSameDay(a: Date, b: Date) {
     a.getDate() === b.getDate();
 }
 
-function naJanelaCheckin(pedido: PedidoReserva): boolean {
-  if (pedido.status !== 'APROVADA') return false;
-  const agora = new Date();
-  const inicio = new Date(pedido.inicioPrevisto);
-  const diffMin = (inicio.getTime() - agora.getTime()) / 60000;
-  return diffMin <= 5 && diffMin >= -15;
+function formatLocalDateISO(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 type FiltroTipo = 'todos' | 'COMPUTADOR' | 'SALA';
-
-// ─── Modal de detalhe do pedido ───────────────────────────────────────────────
-
-function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: {
-  pedido: PedidoReserva;
-  aprovacoes: AprovacaoReserva[];
-  onClose: () => void;
-  onRefresh: () => Promise<void>;
-}) {
-  const [acting, setActing] = useState<string | null>(null);
-  const [motivo, setMotivo] = useState('');
-  const [error, setError] = useState('');
-
-  const isPc = pedido.tipo === 'COMPUTADOR';
-  const itens = isPc
-    ? pedido.reservasComputador?.map(r => r.computador?.codigo ?? '—') ?? []
-    : pedido.reservasSala?.map(r => r.sala?.nome ?? '—') ?? [];
-
-  const primeiraReserva = isPc
-    ? pedido.reservasComputador?.[0]
-    : pedido.reservasSala?.[0];
-
-  const aprovacaoPendente = aprovacoes.find(ap => ap.pedido?.id === pedido.id);
-  const podeAprovar = pedido.status === 'PENDENTE_APROVACAO' && !!aprovacaoPendente;
-  const podeCancelar = ['APROVADA', 'PENDENTE_APROVACAO', 'EM_ANDAMENTO'].includes(pedido.status);
-
-  const handleCancelar = async () => {
-    if (!confirm('Cancelar este pedido?')) return;
-    setActing('cancelar');
-    setError('');
-    try {
-      await pedidosApi.cancelarComoAdmin(pedido.id);
-      await onRefresh();
-      onClose();
-    } catch (e: unknown) {
-      console.error('Erro ao cancelar pedido:', e);
-      setError(e instanceof Error ? e.message : 'Erro ao cancelar');
-    }
-    setActing(null);
-  };
-
-  const handleAprovacao = async (acao: 'aprovar' | 'rejeitar') => {
-    if (!aprovacaoPendente) return;
-    setActing(acao);
-    setError('');
-    try {
-      if (acao === 'aprovar') await aprovacaoApi.aprovar(aprovacaoPendente.id, motivo || undefined);
-      else await aprovacaoApi.rejeitar(aprovacaoPendente.id, motivo || undefined);
-      await onRefresh();
-      onClose();
-    } catch (e: unknown) {
-      console.error('Erro ao processar aprovação:', e);
-      setError(e instanceof Error ? e.message : 'Erro');
-    }
-    setActing(null);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-[#161b22] rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
-
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <div className="flex items-center gap-2">
-            <span className={`text-xs font-bold px-2 py-0.5 rounded ${isPc
-              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-              : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
-              {isPc ? 'COMPUTADOR' : 'SALA'}
-            </span>
-            <span className="text-xs text-[var(--text-muted)]">Pedido #{pedido.id}</span>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)]">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="overflow-y-auto flex-1 p-6 space-y-4">
-
-          {/* Itens */}
-          <div>
-            <p className="text-xs text-[var(--text-muted)] mb-2">{isPc ? 'Computadores' : 'Salas'}</p>
-            <div className="flex flex-wrap gap-2">
-              {itens.map((item, i) => (
-                <span key={i} className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${isPc
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-mono'
-                  : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'}`}>
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Dados do usuário */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Nome</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.usuario?.nome}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">E-mail</p>
-              <p className="text-xs text-[var(--text-muted)]">{pedido.usuario?.email}</p>
-            </div>
-            {pedido.usuario?.cpf && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">CPF</p>
-                <p className="text-xs text-[var(--text-muted)] font-mono">{maskCpf(pedido.usuario.cpf)}</p>
-              </div>
-            )}
-            {pedido.usuario?.telefone && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">Telefone</p>
-                <p className="text-xs text-[var(--text-muted)]">{maskTel(pedido.usuario.telefone)}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Status, pessoas, horário */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Status</p>
-              <StatusBadge status={pedido.status} />
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Pessoas</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.qtdePessoas}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {new Date(pedido.inicioPrevisto).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Horário previsto</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatTime(pedido.inicioPrevisto)} → {formatTime(pedido.fimPrevisto)}
-              </p>
-            </div>
-          </div>
-
-          {pedido.observacao && (
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Observação</p>
-              <p className="text-sm text-[var(--text-secondary)]">{pedido.observacao}</p>
-            </div>
-          )}
-
-          {/* Check-in / Check-out realizados */}
-          <CheckinCheckoutInfo
-            checkinEm={primeiraReserva?.checkinEm}
-            checkoutEm={primeiraReserva?.checkoutEm}
-          />
-
-          {/* Ações admin */}
-          {(podeAprovar || podeCancelar) && (
-            <div className="space-y-3 pt-2 border-t border-[var(--border)]">
-              {podeAprovar && (
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    className="input-field text-sm"
-                    placeholder="Motivo (opcional)"
-                    value={motivo}
-                    onChange={e => setMotivo(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <button onClick={() => handleAprovacao('rejeitar')} disabled={!!acting}
-                      className="btn-danger flex-1 flex items-center justify-center gap-2 text-sm">
-                      {acting === 'rejeitar'
-                        ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        : '✕'}
-                      Rejeitar
-                    </button>
-                    <button onClick={() => handleAprovacao('aprovar')} disabled={!!acting}
-                      className="btn-success flex-1 flex items-center justify-center gap-2 text-sm">
-                      {acting === 'aprovar'
-                        ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        : '✓'}
-                      Aprovar
-                    </button>
-                  </div>
-                </div>
-              )}
-              {podeCancelar && (
-                <button onClick={handleCancelar} disabled={!!acting}
-                  className="btn-danger w-full flex items-center justify-center gap-2 text-sm">
-                  {acting === 'cancelar'
-                    ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    : null}
-                  {acting === 'cancelar' ? 'Cancelando...' : 'Cancelar reserva'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {error && (
-            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
-              <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Dashboard principal ──────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
-  const [pedidos, setPedidos] = useState<PedidoReserva[]>([]);
+
+  // Dados fixos e em tempo real do dia de HOJE para os cards do topo
+  const [pedidosHoje, setPedidosHoje] = useState<PedidoReserva[]>([]);
+
+  // Cache que armazena os dados das semanas já visitadas para evitar refetching
+  const [cacheSemanas, setCacheSemanas] = useState<{ [periodoChave: string]: PedidoReserva[] }>({});
+
   const [pendentes, setPendentes] = useState<AprovacaoReserva[]>([]);
   const [allPcs, setAllPcs] = useState<Computador[]>([]);
   const [allSalas, setAllSalas] = useState<Sala[]>([]);
   const [usersCount, setUsersCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loadingGlobal, setLoadingGlobal] = useState(true);
+  const [loadingCalendario, setLoadingCalendario] = useState(false);
   const [filtroSemana, setFiltroSemana] = useState<FiltroTipo>('todos');
   const [selectedPedido, setSelectedPedido] = useState<PedidoReserva | null>(null);
 
@@ -273,45 +72,92 @@ export default function AdminDashboard() {
   const selectedPedidoRef = useRef(selectedPedido);
   selectedPedidoRef.current = selectedPedido;
 
-  const fetchAll = useCallback(async () => {
-    if (typeof window !== 'undefined' && !localStorage.getItem('token')) return;
+  // Gera uma string identificadora única para a semana visível
+  const currentWeekDays = getWeekDays(weekOffset);
+  const chavePeriodoAtual = `${formatLocalDateISO(currentWeekDays[0])}_${formatLocalDateISO(currentWeekDays[6])}`;
+
+  const fetchAll = useCallback(async (forcarRevalidacao = false) => {
+    if (typeof window !== 'undefined' && !localStorage.getItem('token')) {
+      setLoadingGlobal(false);
+      router.push('/login');
+      return;
+    }
     try {
-      const [pd, ap, u, pcs, sls] = await Promise.all([
-        pedidosApi.todos(),
+      const hojeStr = formatLocalDateISO(today);
+      const diasDaSemanaAlvo = getWeekDays(weekOffset);
+      const dataInicioStr = formatLocalDateISO(diasDaSemanaAlvo[0]);
+      const dataFimStr = formatLocalDateISO(diasDaSemanaAlvo[6]);
+      const chaveDestaSemana = `${dataInicioStr}_${dataFimStr}`;
+
+      const existeNoCache = !!cacheSemanas[chaveDestaSemana];
+
+      // Se já temos a semana no cache e não é uma revalidação automática de 30s, atualizamos apenas dados rápidos de hoje
+      if (!forcarRevalidacao && existeNoCache) {
+        const [pdHoje, ap, u, pcs, sls] = await Promise.all([
+          pedidosApi.filtrar({ data: hojeStr }), // Corrigido aqui
+          aprovacaoApi.pendentes(),
+          usuarios.stats(),
+          computadoresApi.listar(),
+          salasApi.listar(),
+        ]);
+        setPedidosHoje(pdHoje ?? []);
+        setPendentes(ap ?? []);
+        setUsersCount(u?.total ?? 0);
+        setAllPcs(pcs ?? []);
+        setAllSalas(sls ?? []);
+        return;
+      }
+
+      // Caso precise buscar (semana nova ou revalidação de 30s)
+      if (!forcarRevalidacao) setLoadingCalendario(true);
+
+      const [pdSemana, pdHoje, ap, u, pcs, sls] = await Promise.all([
+        pedidosApi.filtrar({ dataInicio: dataInicioStr, dataFim: dataFimStr }), // Corrigido aqui
+        pedidosApi.filtrar({ data: hojeStr }), // Corrigido aqui
         aprovacaoApi.pendentes(),
-        usuarios.listar(),
+        usuarios.stats(),
         computadoresApi.listar(),
         salasApi.listar(),
       ]);
-      setPedidos(pd);
-      setPendentes(ap);
-      setUsersCount(u.length);
-      setAllPcs(pcs);
-      setAllSalas(sls);
+
+      // Atualiza o cache adicionando ou sobrepondo a semana correspondente
+      setCacheSemanas(prev => ({
+        ...prev,
+        [chaveDestaSemana]: pdSemana ?? []
+      }));
+
+      setPedidosHoje(pdHoje ?? []);
+      setPendentes(ap ?? []);
+      setUsersCount(u?.total ?? 0);
+      setAllPcs(pcs ?? []);
+      setAllSalas(sls ?? []);
     } catch (err) {
       console.error('Erro ao carregar dados do admin:', err);
+    } finally {
+      setLoadingGlobal(false);
+      setLoadingCalendario(false);
     }
-    setLoading(false);
-  }, []);
+  }, [weekOffset, cacheSemanas, router]);
 
   const { isLoading: authLoading } = useAuth();
 
+  // Polling de 30 segundos (Revalidação silenciosa em background)
   useEffect(() => {
     if (!authLoading) {
       let id: ReturnType<typeof setInterval>;
 
       const iniciar = () => {
-        id = setInterval(fetchAll, 30000);
+        id = setInterval(() => fetchAll(true), 30000);
       };
 
       const pausar = () => clearInterval(id);
 
       const handleVisibility = () => {
         if (document.hidden) pausar();
-        else { fetchAll(); iniciar(); }
+        else { fetchAll(true); iniciar(); }
       };
 
-      fetchAll();
+      fetchAll(false);
       iniciar();
       document.addEventListener('visibilitychange', handleVisibility);
 
@@ -322,26 +168,35 @@ export default function AdminDashboard() {
     }
   }, [fetchAll, authLoading]);
 
+  // Altera o dia selecionado por padrão ao paginar a semana
   useEffect(() => {
     setSelectedDay(getWeekDays(weekOffset)[0]);
   }, [weekOffset]);
 
+  // Mantém o modal sincronizado caso os dados em cache mudem em background
   useEffect(() => {
     if (!selectedPedidoRef.current) return;
-    const atualizado = pedidos.find(p => p.id === selectedPedidoRef.current!.id);
+    const pedidosDaSemanaAtual = cacheSemanas[chavePeriodoAtual] || [];
+    const atualizado = pedidosDaSemanaAtual.find(p => p.id === selectedPedidoRef.current!.id) ||
+      pedidosHoje.find(p => p.id === selectedPedidoRef.current!.id);
     if (atualizado) setSelectedPedido(atualizado);
-  }, [pedidos]);
+  }, [cacheSemanas, pedidosHoje, chavePeriodoAtual]);
 
-  const pedidosHojePC = pedidos.filter(p => p.tipo === 'COMPUTADOR' && isSameDay(new Date(p.inicioPrevisto), today));
-  const pedidosHojeSala = pedidos.filter(p => p.tipo === 'SALA' && isSameDay(new Date(p.inicioPrevisto), today));
+  // Seleciona os dados da semana atual a partir do cache para renderizar o calendário
+  const pedidosSemanaAtual = cacheSemanas[chavePeriodoAtual] || [];
 
-  const emUsoPC = pedidos
+  // Dados dos cards fixos de HOJE
+  const pedidosHojePC = pedidosHoje.filter(p => p.tipo === 'COMPUTADOR');
+  const pedidosHojeSala = pedidosHoje.filter(p => p.tipo === 'SALA');
+
+  // Status de uso em tempo real (baseado sempre em HOJE)
+  const emUsoPC = pedidosHoje
     .filter(p => p.tipo === 'COMPUTADOR')
     .flatMap(p => p.reservasComputador ?? [])
     .filter(r => r.status === 'EM_ANDAMENTO')
     .length;
 
-  const emUsoSala = pedidos
+  const emUsoSala = pedidosHoje
     .filter(p => p.tipo === 'SALA')
     .flatMap(p => p.reservasSala ?? [])
     .filter(r => r.status === 'EM_ANDAMENTO')
@@ -350,16 +205,18 @@ export default function AdminDashboard() {
   const totalPcsAtivos = allPcs.filter(p => p.ativo).length;
   const totalSalasAtivas = allSalas.filter(s => s.ativo).length;
 
-  const pedidosDiaFiltrados = pedidos
-    .filter(p => isSameDay(new Date(p.inicioPrevisto), selectedDay))
-    .filter(p => filtroSemana === 'todos' || p.tipo === filtroSemana)
-    .sort((a, b) => new Date(a.inicioPrevisto).getTime() - new Date(b.inicioPrevisto).getTime());
+  // Filtra as linhas do dia selecionado consumindo a lista armazenada no cache
+  const pedidosDiaFiltrados = useMemo(() => {
+    return pedidosSemanaAtual
+      .filter(p => isSameDay(new Date(p.inicioPrevisto), selectedDay))
+      .filter(p => filtroSemana === 'todos' || p.tipo === filtroSemana)
+      .sort((a, b) => new Date(a.inicioPrevisto).getTime() - new Date(b.inicioPrevisto).getTime());
+  }, [pedidosSemanaAtual, selectedDay, filtroSemana]);
 
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const todayStr = formatLocalDateISO(today);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -385,7 +242,7 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* Cards de hoje */}
+      {/* Cards de hoje - Fixos */}
       <div className="grid grid-cols-2 gap-4">
         <button
           onClick={() => router.push(`/dashboard/admin/reservas-admin?tipo=COMPUTADOR&data=${todayStr}`)}
@@ -397,7 +254,7 @@ export default function AdminDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </div>
-          <p className="text-2xl font-bold text-blue-600">{loading ? '—' : pedidosHojePC.length}</p>
+          <p className="text-2xl font-bold text-blue-600">{loadingGlobal ? '—' : pedidosHojePC.length}</p>
           <p className="text-xs text-[var(--text-muted)] mt-1">Reservas de PC hoje</p>
           <p className="text-xs text-blue-500 mt-0.5 font-medium">Ver todas →</p>
         </button>
@@ -412,26 +269,26 @@ export default function AdminDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </div>
-          <p className="text-2xl font-bold text-violet-600">{loading ? '—' : pedidosHojeSala.length}</p>
+          <p className="text-2xl font-bold text-violet-600">{loadingGlobal ? '—' : pedidosHojeSala.length}</p>
           <p className="text-xs text-[var(--text-muted)] mt-1">Reservas de Sala hoje</p>
           <p className="text-xs text-violet-500 mt-0.5 font-medium">Ver todas →</p>
         </button>
       </div>
 
-      {/* Em uso agora */}
+      {/* Em uso agora - Fixo */}
       <div>
         <h2 className="section-title mb-3">Em uso agora</h2>
         <div className="grid grid-cols-2 gap-4">
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-sm font-medium text-[var(--text-secondary)]">Computadores em uso</span>
+              <span className="text-sm font-medium text-[var(--text-secondary)]">Computadores in use</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-4xl font-bold text-[var(--text-primary)]">{loading ? '—' : emUsoPC}</span>
-              <span className="text-xl text-[var(--text-muted)] mb-1">/ {loading ? '—' : totalPcsAtivos}</span>
+              <span className="text-4xl font-bold text-[var(--text-primary)]">{loadingGlobal ? '—' : emUsoPC}</span>
+              <span className="text-xl text-[var(--text-muted)] mb-1">/ {loadingGlobal ? '—' : totalPcsAtivos}</span>
             </div>
-            {!loading && totalPcsAtivos > 0 && (
+            {!loadingGlobal && totalPcsAtivos > 0 && (
               <div className="mt-3 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
                 <div className="h-full rounded-full bg-emerald-500 transition-all duration-700"
                   style={{ width: `${(emUsoPC / totalPcsAtivos) * 100}%` }} />
@@ -444,10 +301,10 @@ export default function AdminDashboard() {
               <span className="text-sm font-medium text-[var(--text-secondary)]">Salas em uso</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-4xl font-bold text-[var(--text-primary)]">{loading ? '—' : emUsoSala}</span>
-              <span className="text-xl text-[var(--text-muted)] mb-1">/ {loading ? '—' : totalSalasAtivas}</span>
+              <span className="text-4xl font-bold text-[var(--text-primary)]">{loadingGlobal ? '—' : emUsoSala}</span>
+              <span className="text-xl text-[var(--text-muted)] mb-1">/ {loadingGlobal ? '—' : totalSalasAtivas}</span>
             </div>
-            {!loading && totalSalasAtivas > 0 && (
+            {!loadingGlobal && totalSalasAtivas > 0 && (
               <div className="mt-3 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
                 <div className="h-full rounded-full bg-emerald-500 transition-all duration-700"
                   style={{ width: `${(emUsoSala / totalSalasAtivas) * 100}%` }} />
@@ -457,11 +314,10 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Calendário semanal */}
+      {/* Calendário semanal com mecanismo de cache */}
       <div>
         <h2 className="section-title mb-4">Reservas da Semana</h2>
         <div className="card overflow-hidden">
-
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
             <button onClick={() => setWeekOffset(w => w - 1)}
               className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
@@ -485,9 +341,11 @@ export default function AdminDashboard() {
             {weekDays.map((day, i) => {
               const isToday = isSameDay(day, today);
               const isSelected = isSameDay(day, selectedDay);
-              const dp = pedidos.filter(p => p.tipo === 'COMPUTADOR' && isSameDay(new Date(p.inicioPrevisto), day)).length;
-              const ds = pedidos.filter(p => p.tipo === 'SALA' && isSameDay(new Date(p.inicioPrevisto), day)).length;
-              const temCheckinPendente = pedidos.some(p => isSameDay(new Date(p.inicioPrevisto), day) && naJanelaCheckin(p));
+
+              const dp = pedidosSemanaAtual.filter(p => p.tipo === 'COMPUTADOR' && isSameDay(new Date(p.inicioPrevisto), day)).length;
+              const ds = pedidosSemanaAtual.filter(p => p.tipo === 'SALA' && isSameDay(new Date(p.inicioPrevisto), day)).length;
+              const temCheckinPendente = pedidosSemanaAtual.some(p => isSameDay(new Date(p.inicioPrevisto), day) && (p.naJanelaCheckin ?? false));
+
               return (
                 <button key={i} onClick={() => setSelectedDay(day)}
                   className={`p-3 text-center transition-colors hover:bg-[var(--surface-2)] ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-b-2 border-blue-600' : ''}`}>
@@ -525,7 +383,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {loading ? (
+            {loadingCalendario ? (
               <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 rounded-lg shimmer" />)}</div>
             ) : pedidosDiaFiltrados.length === 0 ? (
               <p className="text-sm text-[var(--text-muted)] text-center py-6">Nenhuma reserva neste dia</p>
@@ -535,7 +393,7 @@ export default function AdminDashboard() {
                   const isPc = p.tipo === 'COMPUTADOR';
                   const qtd = isPc ? p.reservasComputador?.length ?? 0 : p.reservasSala?.length ?? 0;
                   const nomeItem = isPc ? `${qtd} computador${qtd !== 1 ? 'es' : ''}` : `${qtd} sala${qtd !== 1 ? 's' : ''}`;
-                  const checkinPendente = naJanelaCheckin(p);
+                  const checkinPendente = p.naJanelaCheckin ?? false;
 
                   const primeiraReserva = isPc
                     ? p.reservasComputador?.[0]
@@ -614,7 +472,7 @@ export default function AdminDashboard() {
           pedido={selectedPedido}
           aprovacoes={pendentes}
           onClose={() => setSelectedPedido(null)}
-          onRefresh={fetchAll}
+          onRefresh={() => fetchAll(true)}
         />
       )}
     </div>
