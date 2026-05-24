@@ -2,32 +2,17 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/auth-context';
-import { pedidos as pedidosApi, reservasComputador as rcApi, reservasSala as rsApi } from '@/lib/api';
+import { pedidos as pedidosApi } from '@/lib/api';
 import { PedidoReserva } from '@/types';
-import { statusReservaLabel, statusReservaColor } from '@/lib/utils';
+import { formatDate, formatTime } from '@/lib/utils';
+import { StatusBadge } from '@/app/components/ui/StatusBadge';
+import { CountdownCheckin } from '@/app/components/ui/CountdownCheckin';
+import { CheckinCheckoutInfo } from '@/app/components/ui/CheckinCheckoutInfo';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_ATIVOS = ['APROVADA', 'PENDENTE_APROVACAO', 'EM_ANDAMENTO'];
-const STATUS_ENCERRADOS = ['FINALIZADA', 'CANCELADA', 'ATRASADO', 'REJEITADA'];
 
-function formatHora(iso: string) {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatData(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-function formatDataHora(iso: string) {
-  return new Date(iso).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
-
-// Retorna info sobre check-in/checkout/cancelamento baseado no horário atual
 function getAcoes(pedido: PedidoReserva) {
   const agora = new Date();
   const inicio = new Date(pedido.inicioPrevisto);
@@ -38,8 +23,8 @@ function getAcoes(pedido: PedidoReserva) {
 
   const podeCheckin =
     pedido.status === 'APROVADA' &&
-    diffInicioMin <= 5 &&           // até 5min antes
-    diffInicioMin >= -15;           // até 15min depois
+    diffInicioMin <= 5 &&
+    diffInicioMin >= -15;
 
   const checkinExpirou =
     pedido.status === 'APROVADA' &&
@@ -49,54 +34,14 @@ function getAcoes(pedido: PedidoReserva) {
 
   const podeCancelar =
     ['APROVADA', 'PENDENTE_APROVACAO'].includes(pedido.status) &&
-    diffInicioMin > 60; // mais de 1h antes
+    diffInicioMin > 60;
 
-  // Tempo até o check-in abrir
-  const minParaCheckin = Math.ceil(diffInicioMin - 5); // abre 5min antes
+  const minParaCheckin = Math.ceil(diffInicioMin - 5);
 
   return { podeCheckin, checkinExpirou, podeCheckout, podeCancelar, minParaCheckin };
 }
 
-// ─── Badge de status ──────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span className={`badge ${statusReservaColor[status as keyof typeof statusReservaColor] ?? 'badge-gray'}`}>
-      {statusReservaLabel[status as keyof typeof statusReservaLabel] ?? status}
-    </span>
-  );
-}
-
-// ─── Contador regressivo para check-in ───────────────────────────────────────
-
-function CountdownCheckin({ inicioPrevisto }: { inicioPrevisto: string }) {
-  const [display, setDisplay] = useState('');
-
-  useEffect(() => {
-    const tick = () => {
-      const agora = new Date();
-      const abertura = new Date(new Date(inicioPrevisto).getTime() - 5 * 60000);
-      const diff = abertura.getTime() - agora.getTime();
-      if (diff <= 0) { setDisplay(''); return; }
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setDisplay(h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [inicioPrevisto]);
-
-  if (!display) return null;
-  return (
-    <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-      Check-in em {display}
-    </span>
-  );
-}
-
-// ─── Modal de detalhes + ações ────────────────────────────────────────────────
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
 function PedidoModal({
   pedido,
@@ -116,8 +61,10 @@ function PedidoModal({
     ? pedido.reservasComputador?.map(r => ({ id: r.id, nome: r.computador?.codigo ?? '—' })) ?? []
     : pedido.reservasSala?.map(r => ({ id: r.id, nome: r.sala?.nome ?? '—' })) ?? [];
 
-  // Usa a primeira reserva do pedido para ações
-  const primeiraReservaId = itens[0]?.id;
+  const primeiraReserva = isPc
+    ? pedido.reservasComputador?.[0]
+    : pedido.reservasSala?.[0];
+
   const { podeCheckin, checkinExpirou, podeCheckout, podeCancelar, minParaCheckin } = getAcoes(pedido);
 
   const handle = async (acao: 'checkin' | 'checkout' | 'cancelar') => {
@@ -142,10 +89,6 @@ function PedidoModal({
     }
     setActing(null);
   };
-
-  const primeiraReserva = isPc
-    ? pedido.reservasComputador?.[0]
-    : pedido.reservasSala?.[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -185,16 +128,16 @@ function PedidoModal({
             </div>
           </div>
 
-          {/* Data e horário */}
+          {/* Data e horário previsto */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
               <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{formatData(pedido.inicioPrevisto)}</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{formatDate(pedido.inicioPrevisto)}</p>
             </div>
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Horário</p>
+              <p className="text-xs text-[var(--text-muted)] mb-1">Horário previsto</p>
               <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
+                {formatTime(pedido.inicioPrevisto)} → {formatTime(pedido.fimPrevisto)}
               </p>
             </div>
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
@@ -210,26 +153,10 @@ function PedidoModal({
           </div>
 
           {/* Check-in / Check-out realizados */}
-          {(primeiraReserva?.checkinEm || primeiraReserva?.checkoutEm) && (
-            <div className="grid grid-cols-2 gap-3">
-              {primeiraReserva?.checkinEm && (
-                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">Check-in</p>
-                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                    {formatDataHora(primeiraReserva.checkinEm)}
-                  </p>
-                </div>
-              )}
-              {primeiraReserva?.checkoutEm && (
-                <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Check-out</p>
-                  <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                    {formatDataHora(primeiraReserva.checkoutEm)}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+          <CheckinCheckoutInfo
+            checkinEm={primeiraReserva?.checkinEm}
+            checkoutEm={primeiraReserva?.checkoutEm}
+          />
 
           {/* Aviso check-in expirado */}
           {checkinExpirou && (
@@ -265,13 +192,9 @@ function PedidoModal({
           {/* Ações */}
           {(podeCheckin || podeCheckout || podeCancelar) && (
             <div className="space-y-2 pt-2 border-t border-[var(--border)]">
-
               {podeCheckin && (
-                <button
-                  onClick={() => handle('checkin')}
-                  disabled={!!acting}
-                  className="btn-success w-full flex items-center justify-center gap-2"
-                >
+                <button onClick={() => handle('checkin')} disabled={!!acting}
+                  className="btn-success w-full flex items-center justify-center gap-2">
                   {acting === 'checkin'
                     ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -280,13 +203,9 @@ function PedidoModal({
                   {acting === 'checkin' ? 'Fazendo check-in...' : 'Fazer Check-in'}
                 </button>
               )}
-
               {podeCheckout && (
-                <button
-                  onClick={() => handle('checkout')}
-                  disabled={!!acting}
-                  className="btn-primary w-full flex items-center justify-center gap-2"
-                >
+                <button onClick={() => handle('checkout')} disabled={!!acting}
+                  className="btn-primary w-full flex items-center justify-center gap-2">
                   {acting === 'checkout'
                     ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -295,15 +214,11 @@ function PedidoModal({
                   {acting === 'checkout' ? 'Fazendo check-out...' : 'Fazer Check-out'}
                 </button>
               )}
-
               {podeCancelar && (
                 <button
-                  onClick={() => {
-                    if (confirm('Cancelar esta reserva? Esta ação não pode ser desfeita.')) handle('cancelar');
-                  }}
+                  onClick={() => { if (confirm('Cancelar esta reserva? Esta ação não pode ser desfeita.')) handle('cancelar'); }}
                   disabled={!!acting}
-                  className="btn-danger w-full flex items-center justify-center gap-2"
-                >
+                  className="btn-danger w-full flex items-center justify-center gap-2">
                   {acting === 'cancelar'
                     ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -315,7 +230,6 @@ function PedidoModal({
             </div>
           )}
 
-          {/* Info de cancelamento quando ainda não disponível */}
           {['APROVADA', 'PENDENTE_APROVACAO'].includes(pedido.status) && !podeCancelar && (
             <p className="text-xs text-[var(--text-muted)] text-center pt-1">
               Cancelamento disponível somente até 1h antes do início.
@@ -329,18 +243,29 @@ function PedidoModal({
 
 // ─── Card de pedido ───────────────────────────────────────────────────────────
 
-function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () => void }) {
+export function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () => void }) {
   const isPc = pedido.tipo === 'COMPUTADOR';
-  const itens = isPc
-    ? pedido.reservasComputador?.map(r => r.computador?.codigo ?? '—') ?? []
-    : pedido.reservasSala?.map(r => r.sala?.nome ?? '—') ?? [];
+  const qtd = isPc ? pedido.reservasComputador?.length ?? 0 : pedido.reservasSala?.length ?? 0;
+  const labelItem = isPc ? `${qtd} computador${qtd !== 1 ? 'es' : ''}` : `${qtd} sala${qtd !== 1 ? 's' : ''}`;
+
+  const primeiraReserva = isPc
+    ? pedido.reservasComputador?.[0]
+    : pedido.reservasSala?.[0];
+
+  const fimExibido = primeiraReserva?.checkoutEm
+    ? formatTime(primeiraReserva.checkoutEm)
+    : formatTime(pedido.fimPrevisto);
 
   const { podeCheckin, podeCheckout, podeCancelar, checkinExpirou } = getAcoes(pedido);
   const temAcao = podeCheckin || podeCheckout || podeCancelar;
   const isAtivo = STATUS_ATIVOS.includes(pedido.status);
-
-  // Indicadores visuais de urgência
   const urgente = podeCheckin || podeCheckout;
+
+  const mostrarCountdown =
+    pedido.status === 'APROVADA' &&
+    !podeCheckin &&
+    !checkinExpirou &&
+    new Date(pedido.inicioPrevisto).getTime() - Date.now() <= 55 * 60 * 1000;
 
   return (
     <div
@@ -357,45 +282,41 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () =>
               : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
               {isPc ? 'PC' : 'SALA'}
             </span>
-            <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-              {itens.join(', ')}
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              {labelItem}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-xs text-[var(--text-muted)]">
-              {formatData(pedido.inicioPrevisto)} · {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
-            </p>
-            {podeCheckin && (
-              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-pulse">
-                ● Check-in disponível!
-              </span>
-            )}
-            {checkinExpirou && (
-              <span className="text-xs font-semibold text-rose-500">
-                ⚠ Check-in expirado
-              </span>
-            )}
-            {podeCheckout && (
-              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                ● Em andamento
-              </span>
-            )}
-            {pedido.status === 'APROVADA' && !podeCheckin && !checkinExpirou && (
+
+          <p className="text-xs text-[var(--text-muted)]">
+            {formatDate(pedido.inicioPrevisto)} · {formatTime(pedido.inicioPrevisto)} → {fimExibido}
+          </p>
+
+          {podeCheckin && (
+            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-pulse block mt-0.5">
+              ● Check-in disponível!
+            </span>
+          )}
+          {checkinExpirou && (
+            <span className="text-xs font-semibold text-rose-500 block mt-0.5">
+              ⚠ Check-in expirado
+            </span>
+          )}
+          {mostrarCountdown && (
+            <div className="mt-0.5">
               <CountdownCheckin inicioPrevisto={pedido.inicioPrevisto} />
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Direita */}
         <div className="flex items-center gap-2 shrink-0">
           <StatusBadge status={pedido.status} />
-          {temAcao && (
-            <div className="w-2 h-2 rounded-full bg-blue-500" />
-          )}
+          {temAcao && <div className="w-2 h-2 rounded-full bg-blue-500" />}
           <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </div>
+
       </div>
     </div>
   );
@@ -404,11 +325,9 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () =>
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function DashboardUsuarioPage() {
-  const { user } = useAuth();
   const [meusPedidos, setMeusPedidos] = useState<PedidoReserva[]>([]);
   const [loading, setLoading] = useState(true);
   const [pedidoSelecionado, setPedidoSelecionado] = useState<PedidoReserva | null>(null);
-  const [mostrarHistorico, setMostrarHistorico] = useState(false);
 
   const fetchPedidos = useCallback(async () => {
     try {
@@ -420,27 +339,39 @@ export default function DashboardUsuarioPage() {
 
   useEffect(() => { fetchPedidos(); }, [fetchPedidos]);
 
-  // Atualiza a cada 30s para manter check-in/checkout em dia
+
+  //quando troca de aba fica inativo pausa as request
   useEffect(() => {
-    const id = setInterval(fetchPedidos, 30000);
-    return () => clearInterval(id);
+    let id: ReturnType<typeof setInterval>;
+
+    const iniciar = () => {
+      id = setInterval(fetchPedidos, 30000);
+    };
+
+    const pausar = () => clearInterval(id);
+
+    const handleVisibility = () => {
+      if (document.hidden) pausar();
+      else { fetchPedidos(); iniciar(); }
+    };
+
+    iniciar();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      pausar();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [fetchPedidos]);
+
 
   const ativos = meusPedidos
     .filter(p => STATUS_ATIVOS.includes(p.status))
     .sort((a, b) => new Date(a.inicioPrevisto).getTime() - new Date(b.inicioPrevisto).getTime());
 
-  const historico = meusPedidos
-    .filter(p => STATUS_ENCERRADOS.includes(p.status))
-    .sort((a, b) => new Date(b.inicioPrevisto).getTime() - new Date(a.inicioPrevisto).getTime());
-
   const emAndamento = ativos.filter(p => p.status === 'EM_ANDAMENTO');
-  const aguardandoCheckin = ativos.filter(p => {
-    const { podeCheckin } = getAcoes(p);
-    return podeCheckin;
-  });
+  const aguardandoCheckin = ativos.filter(p => getAcoes(p).podeCheckin);
 
-  // Re-abre o modal com dados atualizados após refresh
   useEffect(() => {
     if (pedidoSelecionado) {
       const atualizado = meusPedidos.find(p => p.id === pedidoSelecionado.id);
@@ -451,9 +382,7 @@ export default function DashboardUsuarioPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
 
-      {/* Header */}
       <div className="flex items-center justify-between">
-
         <Link href="/dashboard/usuario/reservar" className="btn-primary flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -462,7 +391,6 @@ export default function DashboardUsuarioPage() {
         </Link>
       </div>
 
-      {/* Alertas de ação imediata */}
       {!loading && aguardandoCheckin.length > 0 && (
         <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 flex items-start gap-3">
           <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 animate-pulse shrink-0" />
@@ -493,7 +421,6 @@ export default function DashboardUsuarioPage() {
         </div>
       )}
 
-      {/* Reservas ativas */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="section-title">Minhas Reservas</h2>
@@ -529,38 +456,6 @@ export default function DashboardUsuarioPage() {
         )}
       </div>
 
-      {/* Histórico */}
-      {historico.length > 0 && (
-        <div>
-          <button
-            onClick={() => setMostrarHistorico(v => !v)}
-            className="w-full flex items-center justify-between py-2 group"
-          >
-            <h2 className="section-title group-hover:text-[var(--text-primary)] transition-colors">
-              Histórico
-            </h2>
-            <div className="flex items-center gap-2 text-[var(--text-muted)]">
-              <span className="text-xs">{historico.length} reserva{historico.length !== 1 ? 's' : ''}</span>
-              <svg
-                className={`w-4 h-4 transition-transform ${mostrarHistorico ? 'rotate-180' : ''}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </button>
-
-          {mostrarHistorico && (
-            <div className="card divide-y divide-[var(--border)] overflow-hidden mt-2">
-              {historico.map(p => (
-                <PedidoCard key={p.id} pedido={p} onClick={() => setPedidoSelecionado(p)} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Modal */}
       {pedidoSelecionado && (
         <PedidoModal
           pedido={pedidoSelecionado}

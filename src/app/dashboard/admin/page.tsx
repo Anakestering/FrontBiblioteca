@@ -11,7 +11,9 @@ import {
   salas as salasApi,
 } from '@/lib/api';
 import { PedidoReserva, AprovacaoReserva, Computador, Sala } from '@/types';
-import { statusReservaLabel, statusReservaColor, formatDateTime, formatDate, maskCpf, maskTel } from '@/lib/utils';
+import { formatDate, formatTime, maskCpf, maskTel } from '@/lib/utils';
+import { StatusBadge } from '@/app/components/ui/StatusBadge';
+import { CheckinCheckoutInfo } from '@/app/components/ui/CheckinCheckoutInfo';
 import { useRouter } from 'next/navigation';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -33,11 +35,6 @@ function isSameDay(a: Date, b: Date) {
     a.getDate() === b.getDate();
 }
 
-function formatHora(iso: string) {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-// Retorna true se o pedido está na janela de check-in (status APROVADA, entre -5min e +15min do início)
 function naJanelaCheckin(pedido: PedidoReserva): boolean {
   if (pedido.status !== 'APROVADA') return false;
   const agora = new Date();
@@ -65,6 +62,10 @@ function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: {
   const itens = isPc
     ? pedido.reservasComputador?.map(r => r.computador?.codigo ?? '—') ?? []
     : pedido.reservasSala?.map(r => r.sala?.nome ?? '—') ?? [];
+
+  const primeiraReserva = isPc
+    ? pedido.reservasComputador?.[0]
+    : pedido.reservasSala?.[0];
 
   const aprovacaoPendente = aprovacoes.find(ap => ap.pedido?.id === pedido.id);
   const podeAprovar = pedido.status === 'PENDENTE_APROVACAO' && !!aprovacaoPendente;
@@ -122,6 +123,7 @@ function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: {
 
         <div className="overflow-y-auto flex-1 p-6 space-y-4">
 
+          {/* Itens */}
           <div>
             <p className="text-xs text-[var(--text-muted)] mb-2">{isPc ? 'Computadores' : 'Salas'}</p>
             <div className="flex flex-wrap gap-2">
@@ -135,6 +137,7 @@ function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: {
             </div>
           </div>
 
+          {/* Dados do usuário */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
               <p className="text-xs text-[var(--text-muted)] mb-1">Nome</p>
@@ -158,12 +161,11 @@ function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: {
             )}
           </div>
 
+          {/* Status, pessoas, horário */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
               <p className="text-xs text-[var(--text-muted)] mb-1">Status</p>
-              <span className={`badge ${statusReservaColor[pedido.status]}`}>
-                {statusReservaLabel[pedido.status]}
-              </span>
+              <StatusBadge status={pedido.status} />
             </div>
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
               <p className="text-xs text-[var(--text-muted)] mb-1">Pessoas</p>
@@ -176,9 +178,9 @@ function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: {
               </p>
             </div>
             <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Horário</p>
+              <p className="text-xs text-[var(--text-muted)] mb-1">Horário previsto</p>
               <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
+                {formatTime(pedido.inicioPrevisto)} → {formatTime(pedido.fimPrevisto)}
               </p>
             </div>
           </div>
@@ -190,6 +192,13 @@ function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: {
             </div>
           )}
 
+          {/* Check-in / Check-out realizados */}
+          <CheckinCheckoutInfo
+            checkinEm={primeiraReserva?.checkinEm}
+            checkoutEm={primeiraReserva?.checkoutEm}
+          />
+
+          {/* Ações admin */}
           {(podeAprovar || podeCancelar) && (
             <div className="space-y-3 pt-2 border-t border-[var(--border)]">
               {podeAprovar && (
@@ -281,12 +290,29 @@ export default function AdminDashboard() {
 
   const { isLoading: authLoading } = useAuth();
 
-  // Carrega ao montar e a cada 30s
   useEffect(() => {
     if (!authLoading) {
+      let id: ReturnType<typeof setInterval>;
+
+      const iniciar = () => {
+        id = setInterval(fetchAll, 30000);
+      };
+
+      const pausar = () => clearInterval(id);
+
+      const handleVisibility = () => {
+        if (document.hidden) pausar();
+        else { fetchAll(); iniciar(); }
+      };
+
       fetchAll();
-      const id = setInterval(fetchAll, 30000);
-      return () => clearInterval(id);
+      iniciar();
+      document.addEventListener('visibilitychange', handleVisibility);
+
+      return () => {
+        pausar();
+        document.removeEventListener('visibilitychange', handleVisibility);
+      };
     }
   }, [fetchAll, authLoading]);
 
@@ -294,7 +320,6 @@ export default function AdminDashboard() {
     setSelectedDay(getWeekDays(weekOffset)[0]);
   }, [weekOffset]);
 
-  // Atualiza modal se o pedido selecionado mudar no refresh
   useEffect(() => {
     if (selectedPedido) {
       const atualizado = pedidos.find(p => p.id === selectedPedido.id);
@@ -302,10 +327,9 @@ export default function AdminDashboard() {
     }
   }, [pedidos]);
 
-  // ── Derivados ──────────────────────────────────────────────────────────────
-
   const pedidosHojePC = pedidos.filter(p => p.tipo === 'COMPUTADOR' && isSameDay(new Date(p.inicioPrevisto), today));
   const pedidosHojeSala = pedidos.filter(p => p.tipo === 'SALA' && isSameDay(new Date(p.inicioPrevisto), today));
+
   const emUsoPC = pedidos
     .filter(p => p.tipo === 'COMPUTADOR')
     .flatMap(p => p.reservasComputador ?? [])
@@ -317,10 +341,10 @@ export default function AdminDashboard() {
     .flatMap(p => p.reservasSala ?? [])
     .filter(r => r.status === 'EM_ANDAMENTO')
     .length;
+
   const totalPcsAtivos = allPcs.filter(p => p.ativo).length;
   const totalSalasAtivas = allSalas.filter(s => s.ativo).length;
 
-  // Reservas de hoje na janela de check-in
   const aguardandoCheckin = pedidos.filter(p =>
     isSameDay(new Date(p.inicioPrevisto), today) && naJanelaCheckin(p)
   );
@@ -432,51 +456,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Aguardando check-in agora — só aparece quando há reservas na janela */}
-      {!loading && aguardandoCheckin.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <h2 className="section-title">Aguardando Check-in</h2>
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
-              {aguardandoCheckin.length}
-            </span>
-          </div>
-          <div className="card divide-y divide-[var(--border)]">
-            {aguardandoCheckin.map(p => {
-              const isPc = p.tipo === 'COMPUTADOR';
-              const nomeItem = isPc
-                ? p.reservasComputador?.map(r => r.computador?.codigo ?? '—').join(', ')
-                : p.reservasSala?.map(r => r.sala?.nome ?? '—').join(', ');
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedPedido(p)}
-                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--surface-2)] transition-colors text-left gap-3"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${isPc
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                      : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
-                      {isPc ? 'PC' : 'SALA'}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{nomeItem}</p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {p.usuario?.nome} · {formatHora(p.inicioPrevisto)} → {formatHora(p.fimPrevisto)}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 shrink-0">
-                    Aguardando check-in
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Calendário semanal */}
       <div>
         <h2 className="section-title mb-4">Reservas da Semana</h2>
@@ -520,7 +499,7 @@ export default function AdminDashboard() {
                   <div className="flex justify-center gap-1 mt-1">
                     {dp > 0 && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />}
                     {ds > 0 && <span className="w-1.5 h-1.5 rounded-full bg-violet-500 inline-block" />}
-                    {temCheckinPendente && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse" />}
+                    {temCheckinPendente && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block animate-pulse" />}
                   </div>
                 </button>
               );
@@ -534,14 +513,11 @@ export default function AdminDashboard() {
               </p>
               <div className="flex gap-1 bg-[var(--surface-2)] p-1 rounded-lg">
                 {(['todos', 'COMPUTADOR', 'SALA'] as FiltroTipo[]).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setFiltroSemana(f)}
+                  <button key={f} onClick={() => setFiltroSemana(f)}
                     className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${filtroSemana === f
                       ? 'bg-white dark:bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
                       : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                      }`}
-                  >
+                      }`}>
                     {f === 'todos' ? 'Todos' : f === 'COMPUTADOR' ? 'PC' : 'Sala'}
                   </button>
                 ))}
@@ -556,19 +532,24 @@ export default function AdminDashboard() {
               <div className="space-y-2">
                 {pedidosDiaFiltrados.map(p => {
                   const isPc = p.tipo === 'COMPUTADOR';
-                  const nomeItem = isPc
-                    ? p.reservasComputador?.map(r => r.computador?.codigo ?? '—').join(', ')
-                    : p.reservasSala?.map(r => r.sala?.nome ?? '—').join(', ');
+                  const qtd = isPc ? p.reservasComputador?.length ?? 0 : p.reservasSala?.length ?? 0;
+                  const nomeItem = isPc ? `${qtd} computador${qtd !== 1 ? 'es' : ''}` : `${qtd} sala${qtd !== 1 ? 's' : ''}`;
                   const checkinPendente = naJanelaCheckin(p);
+
+                  const primeiraReserva = isPc
+                    ? p.reservasComputador?.[0]
+                    : p.reservasSala?.[0];
+
+                  const fimExibido = primeiraReserva?.checkoutEm
+                    ? formatTime(primeiraReserva.checkoutEm)
+                    : formatTime(p.fimPrevisto);
+
                   return (
-                    <button
-                      key={p.id}
-                      onClick={() => setSelectedPedido(p)}
+                    <button key={p.id} onClick={() => setSelectedPedido(p)}
                       className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors gap-3 text-left ${checkinPendente
-                        ? 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/20'
+                        ? 'bg-amber-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/20'
                         : 'bg-[var(--surface-2)] hover:bg-[var(--border)]'
-                        }`}
-                    >
+                        }`}>
                       <div className="flex items-center gap-3 min-w-0">
                         <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${isPc
                           ? 'text-blue-600 bg-blue-100 dark:bg-blue-900/30'
@@ -578,16 +559,16 @@ export default function AdminDashboard() {
                         </span>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-[var(--text-primary)] truncate">{nomeItem}</p>
-                          <p className="text-xs text-[var(--text-muted)]">{p.usuario?.email}</p>
+                          <p className="text-xs text-[var(--text-muted)]">{p.usuario?.nome}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <p className="text-xs text-[var(--text-muted)] font-mono">
-                          {formatDateTime(p.inicioPrevisto).split(' ')[1]} → {formatDateTime(p.fimPrevisto).split(' ')[1]}
+                          {formatTime(p.inicioPrevisto)} → {fimExibido}
                         </p>
                         {checkinPendente
-                          ? <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Aguard. check-in</span>
-                          : <span className={`badge ${statusReservaColor[p.status]}`}>{statusReservaLabel[p.status]}</span>
+                          ? <span className="text-xs font-semibold text-rose-500 dark:text-rose-400">Aguard. check-in</span>
+                          : <StatusBadge status={p.status} />
                         }
                       </div>
                     </button>

@@ -25,6 +25,17 @@ const navItems: NavItem[] = [
     ),
   },
   {
+  href: '/dashboard/usuario/historico',
+  label: 'Histórico',
+  adminOnly: false,
+  icon: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+},
+  {
     href: '/dashboard/usuario/reservar',
     label: 'Nova Reserva',
     adminOnly: false,
@@ -34,6 +45,7 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
+  
   {
     href: '/dashboard/admin',
     label: 'Painel Admin',

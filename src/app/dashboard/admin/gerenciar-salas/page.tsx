@@ -36,7 +36,7 @@ export default function GerenciarSalasPage() {
     setLoading(true);
     try {
       setList(await salasApi.listarTodas());
-    } catch (_) {}
+    } catch (err) { console.error(err); }
     setLoading(false);
   };
 

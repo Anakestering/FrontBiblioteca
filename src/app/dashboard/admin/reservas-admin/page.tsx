@@ -250,9 +250,9 @@ function DetalheModal({ pedido, aprovacoes, onClose, onRefresh }: {
 
 function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () => void }) {
   const isPC = pedido.tipo === 'COMPUTADOR';
-  const itens = isPC
-    ? pedido.reservasComputador.map(r => r.computador.codigo)
-    : pedido.reservasSala.map(r => r.sala.nome);
+  const qtd = isPC ? pedido.reservasComputador.length : pedido.reservasSala.length;
+  const labelItem = isPC ? `${qtd} computador${qtd !== 1 ? 'es' : ''}` : `${qtd} sala${qtd !== 1 ? 's' : ''}`;
+
   const encerrado = STATUS_ENCERRADAS.includes(pedido.status);
 
   return (
@@ -261,16 +261,14 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () =>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            {itens.slice(0, 4).map((item, i) => (
-              <span key={i} className={`text-xs font-semibold px-2 py-0.5 rounded ${isPC
-                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-mono'
-                : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'}`}>
-                {item}
-              </span>
-            ))}
-            {itens.length > 4 && (
-              <span className="text-xs text-[var(--text-muted)]">+{itens.length - 4}</span>
-            )}
+            <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${isPC
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+              : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
+              {isPC ? 'PC' : 'SALA'}
+            </span>
+            <span className="text-sm font-medium text-[var(--text-primary)]">
+              {labelItem}
+            </span>
           </div>
           <p className="text-xs text-[var(--text-muted)] truncate">
             {pedido.usuario.nome} · {pedido.usuario.email}
@@ -302,7 +300,9 @@ function ReservasAdminPage() {
   const tipoParam = searchParams.get('tipo') as TipoPedido | null;
   const dataParam = searchParams.get('data');
 
-  const [tab, setTab] = useState<TipoPedido>(tipoParam === 'SALA' ? 'SALA' : 'COMPUTADOR');
+  const [tab, setTab] = useState<TipoPedido | 'TODOS'>(
+    tipoParam === 'SALA' ? 'SALA' : tipoParam === 'COMPUTADOR' ? 'COMPUTADOR' : 'TODOS'
+  );
   const [todosPedidos, setTodosPedidos] = useState<PedidoReserva[]>([]);
   const [aprovacoes, setAprovacoes] = useState<AprovacaoReserva[]>([]);
   const [loading, setLoading] = useState(true);
@@ -320,7 +320,7 @@ function ReservasAdminPage() {
       ]);
       setTodosPedidos(ped);
       setAprovacoes(ap);
-    } catch (_) {}
+    } catch (_) { }
     setLoading(false);
   };
 
@@ -328,7 +328,7 @@ function ReservasAdminPage() {
 
   const pedidosFiltrados = todosPedidos
     .filter(p => {
-      if (p.tipo !== tab) return false;
+      if (tab !== 'TODOS' && p.tipo !== tab) return false;
       if (statusFilter && p.status !== statusFilter) return false;
       if (dataFiltro && p.inicioPrevisto.substring(0, 10) !== dataFiltro) return false;
       if (search) {
@@ -355,7 +355,7 @@ function ReservasAdminPage() {
         <div>
           <h1 className="page-title">Todas as Reservas</h1>
           <p className="text-sm text-[var(--text-muted)] mt-1">
-            {todosPedidos.length} pedido{todosPedidos.length !== 1 ? 's' : ''} no total
+            {todosPedidos.length} {todosPedidos.length !== 1 ? '' : ''} até hoje
           </p>
         </div>
         <Link href="/dashboard/usuario/reservar" className="btn-primary flex items-center gap-2">
@@ -368,20 +368,33 @@ function ReservasAdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-[var(--surface-2)] rounded-xl w-fit">
-        {(['COMPUTADOR', 'SALA'] as TipoPedido[]).map(t => (
-          <button key={t} onClick={() => { setTab(t); setStatusFilter(''); }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t
-              ? 'bg-white dark:bg-[#161b22] text-[var(--text-primary)] shadow-sm'
-              : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-            {t === 'COMPUTADOR' ? `💻 Computadores (${totalComputador})` : `🏫 Salas (${totalSala})`}
-          </button>
-        ))}
+        <button
+          onClick={() => { setTab('TODOS'); setStatusFilter(''); }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'TODOS'
+            ? 'bg-white dark:bg-[#161b22] text-[var(--text-primary)] shadow-sm'
+            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+          Todos ({totalComputador + totalSala})
+        </button>
+        <button
+          onClick={() => { setTab('COMPUTADOR'); setStatusFilter(''); }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'COMPUTADOR'
+            ? 'bg-white dark:bg-[#161b22] text-[var(--text-primary)] shadow-sm'
+            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+          Computadores ({totalComputador})
+        </button>
+        <button
+          onClick={() => { setTab('SALA'); setStatusFilter(''); }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'SALA'
+            ? 'bg-white dark:bg-[#161b22] text-[var(--text-primary)] shadow-sm'
+            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+          Salas ({totalSala})
+        </button>
       </div>
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
         <input type="text"
-          placeholder={tab === 'COMPUTADOR' ? 'Buscar por usuário ou PC...' : 'Buscar por usuário ou sala...'}
+          placeholder={tab === 'COMPUTADOR' ? 'Buscar por usuário ou PC...' : tab === 'SALA' ? 'Buscar por usuário ou sala...' : 'Buscar por usuário...'}
           value={search} onChange={e => setSearch(e.target.value)}
           className="input-field max-w-xs" />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as StatusReserva | '')}
