@@ -162,3 +162,18 @@ export interface PedidoReservaDTO {
   qtdePessoas: number;
   observacao?: string;
 }
+
+export interface RecuperacaoSolicitacaoDTO {
+  email: string;
+}
+
+export interface RecuperarSenhaDTO {
+  email: string;
+  codigo: string;
+  novaSenha: string;
+}
+
+export interface TrocarSenhaDTO {
+  senhaAtual: string;
+  novaSenha: string;
+}

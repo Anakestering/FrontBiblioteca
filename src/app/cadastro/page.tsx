@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/api';
+import { PasswordInput } from '@/app/components/ui/PasswordInput';
+import { maskCpf } from '@/lib/utils';
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -15,19 +17,14 @@ export default function CadastroPage() {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
   };
 
-  const formatCpf = (v: string) => {
-    const digits = v.replace(/\D/g, '').slice(0, 11);
-    return digits
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-  };
+  const senhasNaoCoincidem = form.confirmarSenha.length > 0 && form.senha !== form.confirmarSenha;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (form.senha.length < 8) { setError('A senha deve ter pelo menos 8 caracteres.'); return; }
+    if (form.senha.length > 18) { setError('A senha deve ter no máximo 18 caracteres.'); return; }
     if (form.senha !== form.confirmarSenha) { setError('As senhas não coincidem.'); return; }
-    if (form.senha.length < 6) { setError('A senha deve ter ao menos 6 caracteres.'); return; }
     setLoading(true);
     try {
       await auth.cadastrar({
@@ -75,10 +72,17 @@ export default function CadastroPage() {
 
             <div>
               <label className="label">CPF</label>
-              <input name="cpf" type="text" className="input-field" placeholder="000.000.000-00"
+              <input
+                name="cpf"
+                type="text"
+                className="input-field font-mono"
+                placeholder="000.000.000-00"
                 value={form.cpf}
-                onChange={e => setForm(f => ({ ...f, cpf: formatCpf(e.target.value) }))}
-                required inputMode="numeric" />
+                onChange={e => setForm(f => ({ ...f, cpf: maskCpf(e.target.value) }))}
+                required
+                inputMode="numeric"
+                maxLength={14}
+              />
             </div>
 
             <div>
@@ -90,13 +94,30 @@ export default function CadastroPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Senha</label>
-                <input name="senha" type="password" className="input-field" placeholder="••••••••"
-                  value={form.senha} onChange={handleChange} required />
+                <PasswordInput
+                  placeholder="Digite sua senha"
+                  value={form.senha}
+                  onChange={v => setForm(f => ({ ...f, senha: v }))}
+                  disabled={loading}
+                  maxLength={18}
+                  hasError={form.senha.length > 18}
+                />
+                {form.senha.length > 18 && (
+                  <p className="text-xs text-rose-500 mt-1">Máximo 18 caracteres.</p>
+                )}
               </div>
               <div>
                 <label className="label">Confirmar senha</label>
-                <input name="confirmarSenha" type="password" className="input-field" placeholder="••••••••"
-                  value={form.confirmarSenha} onChange={handleChange} required />
+                <PasswordInput
+                  placeholder="Repita a senha"
+                  value={form.confirmarSenha}
+                  onChange={v => setForm(f => ({ ...f, confirmarSenha: v }))}
+                  disabled={loading}
+                  hasError={senhasNaoCoincidem}
+                />
+                {senhasNaoCoincidem && (
+                  <p className="text-xs text-rose-500 mt-1">As senhas devem ser iguais.</p>
+                )}
               </div>
             </div>
 
@@ -109,7 +130,11 @@ export default function CadastroPage() {
               </div>
             )}
 
-            <button type="submit" disabled={loading} className="btn-primary w-full mt-2 flex items-center justify-center gap-2">
+            <button
+              type="submit"
+              disabled={loading || senhasNaoCoincidem}
+              className="btn-primary w-full mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {loading ? (
                 <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Cadastrando...</>
               ) : 'Criar conta'}

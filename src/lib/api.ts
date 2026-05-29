@@ -2,11 +2,12 @@ import {
   AuthDTO, AuthResponse, CadastroDTO,
   Computador, ComputadorDTO,
   Sala, SalaDTO,
-  ReservaComputador, ReservaComputadorDTO,
-  ReservaSala, ReservaSalaDTO,
+  ReservaComputador, 
+  ReservaSala, 
   AprovacaoReserva, Usuario,
   PedidoReservaDTO,
   PedidoReserva,
+  RecuperacaoSolicitacaoDTO, RecuperarSenhaDTO, TrocarSenhaDTO,
 } from '@/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -60,8 +61,13 @@ export const auth = {
     request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(dto) }),
   cadastrar: (dto: CadastroDTO) =>
     request<string>('/usuarios/cadastro', { method: 'POST', body: JSON.stringify(dto) }),
+  solicitarRecuperacao: (dto: RecuperacaoSolicitacaoDTO) =>
+    request<{ message: string; expiresAt: string }>('/auth/recuperar-senha/solicitar', { method: 'POST', body: JSON.stringify(dto) }),
+  alterarSenha: (dto: RecuperarSenhaDTO) =>
+    request<{ message: string }>('/auth/recuperar-senha/alterar', {
+      method: 'POST', body: JSON.stringify(dto),
+    }),
 };
-
 // ─── Computadores ─────────────────────────────────────────────────────────────
 export const computadores = {
   listar: () => request<Computador[]>('/computadores'),
@@ -77,7 +83,7 @@ export const computadores = {
     request<void>(`/computadores/${id}/desativar`, { method: 'PATCH' }),
   deletar: (id: number) =>
     request<void>(`/computadores/${id}`, { method: 'DELETE' }),
-  
+
 };
 
 
@@ -96,21 +102,11 @@ export const salas = {
     request<void>(`/salas/${id}/desativar`, { method: 'PATCH' }),
   deletar: (id: number) =>
     request<void>(`/salas/${id}`, { method: 'DELETE' }),
-  
+
 };
 
 // ─── Reservas Computador ─────────────────────────────────────────────────────
 export const reservasComputador = {
-  criar: (dto: ReservaComputadorDTO) =>
-    request<ReservaComputador>('/reservas/computador', { method: 'POST', body: JSON.stringify(dto) }),
-  minhas: () => request<ReservaComputador[]>('/reservas/computador/minhas'),
-  todas: () => request<ReservaComputador[]>('/reservas/computador'),
-  checkin: (id: number) =>
-    request<ReservaComputador>(`/reservas/computador/${id}/checkin`, { method: 'POST' }),
-  checkout: (id: number) =>
-    request<ReservaComputador>(`/reservas/computador/${id}/checkout`, { method: 'POST' }),
-  cancelar: (id: number) =>
-    request<ReservaComputador>(`/reservas/computador/${id}/cancelar`, { method: 'POST' }),
   ocupados: (computadorId: number, data: string) =>
     request<string[]>(`/reservas/computador/${computadorId}/ocupados?data=${data}`),
   cancelarComoAdmin: (id: number) =>
@@ -119,21 +115,10 @@ export const reservasComputador = {
 
 // ─── Reservas Sala ────────────────────────────────────────────────────────────
 export const reservasSala = {
-  criar: (dto: ReservaSalaDTO) =>
-    request<ReservaSala>('/reservas/sala', { method: 'POST', body: JSON.stringify(dto) }),
-  minhas: () => request<ReservaSala[]>('/reservas/sala/minhas'),
-  todas: () => request<ReservaSala[]>('/reservas/sala'),
-  checkin: (id: number) =>
-    request<ReservaSala>(`/reservas/sala/${id}/checkin`, { method: 'POST' }),
-  checkout: (id: number) =>
-    request<ReservaSala>(`/reservas/sala/${id}/checkout`, { method: 'POST' }),
-  cancelar: (id: number) =>
-    request<ReservaSala>(`/reservas/sala/${id}/cancelar`, { method: 'POST' }),
-   ocupados: (salaId: number, data: string) =>
+  ocupados: (salaId: number, data: string) =>
     request<string[]>(`/reservas/sala/${salaId}/ocupados?data=${data}`),
-   cancelarComoAdmin: (id: number) =>
+  cancelarComoAdmin: (id: number) =>
     request<ReservaSala>(`/reservas/sala/${id}/cancelar-admin`, { method: 'POST' }),
-   
 };
 
 // ─── Aprovações ───────────────────────────────────────────────────────────────
@@ -148,21 +133,28 @@ export const aprovacoes = {
 export const pedidos = {
   criar: (dto: PedidoReservaDTO) =>
     request<PedidoReserva>('/pedidos', { method: 'POST', body: JSON.stringify(dto) }),
-  meus: () => request<PedidoReserva[]>('/pedidos/meus'),
+  meus: () => request<PedidoReserva[]>('/pedidos/minhos'),
   todos: () => request<PedidoReserva[]>('/pedidos'),
- cancelarComoAdmin: (id: number) =>
+  cancelarComoAdmin: (id: number) =>
     request<unknown>(`/pedidos/${id}/cancelar-admin`, { method: 'POST' }),
+  checkin: (id: number) =>
+    request<void>(`/pedidos/${id}/checkin`, { method: 'POST' }),
+  checkout: (id: number) =>
+    request<void>(`/pedidos/${id}/checkout`, { method: 'POST' }),
+  cancelar: (id: number) =>
+    request<void>(`/pedidos/${id}/cancelar`, { method: 'POST' }),
 };
 
 // ─── Usuários ─────────────────────────────────────────────────────────────────
 export const usuarios = {
-  listar: () => request<Usuario[]>('/usuarios'),
+  listar: () => request<Usuario[]>('/usuarios'),           // só admin deve usar
+  buscarMe: () => request<Usuario>('/usuarios/me'),        // novo — perfil do usuário logado
   buscar: (id: number) => request<Usuario>(`/usuarios/${id}`),
   atualizar: (id: number, dto: Partial<{ nome: string; email: string; cpf: string; telefone?: string }>) =>
     request<Usuario>(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id: number) => request<void>(`/usuarios/${id}`, { method: 'DELETE' }),
   ativar: (id: number) =>
-    request(`/usuarios/${id}/ativar`, {
-      method: 'PUT',
-    }),
+    request(`/usuarios/${id}/ativar`, { method: 'PUT' }),
+  trocarSenha: (dto: TrocarSenhaDTO) =>
+    request<{ message: string }>('/usuarios/me/senha', { method: 'PATCH', body: JSON.stringify(dto) }),
 };

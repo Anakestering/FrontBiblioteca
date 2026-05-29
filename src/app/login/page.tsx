@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { auth } from '@/lib/api';
+import { PasswordInput } from '@/app/components/ui/PasswordInput';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -67,14 +67,11 @@ export default function LoginPage() {
 
             <div>
               <label className="label">Senha</label>
-              <input
-                type="password"
-                className="input-field"
+              <PasswordInput
                 placeholder="••••••••"
                 value={senha}
-                onChange={e => setSenha(e.target.value)}
-                required
-                autoComplete="current-password"
+                onChange={setSenha}
+                disabled={loading}
               />
             </div>
 
@@ -100,9 +97,11 @@ export default function LoginPage() {
 
           <div className="flex justify-between items-center mt-5 pt-5 border-t border-[var(--border)]">
             <Link href="/cadastro" className="text-sm text-blue-600 hover:text-blue-700 hover:underline underline-offset-2 transition-colors">
-              Criar conta
+              Não é cadastrado?
             </Link>
-            <span className="text-xs text-[var(--text-muted)]">v1.0</span>
+            <Link href="/recuperar-senha" className="text-sm text-blue-600 hover:text-blue-700 hover:underline underline-offset-2 transition-colors">
+              Esqueceu sua senha?
+            </Link>
           </div>
         </div>
       </div>
