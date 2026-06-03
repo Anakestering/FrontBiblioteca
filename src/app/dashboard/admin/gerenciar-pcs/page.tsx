@@ -189,7 +189,7 @@ export default function GerenciarComputadoresPage() {
         onButtonClick={openCriar}
       />
 
-      <SearchInput value={search} onChange={setSearch} placeholder="Buscar por código..." />
+      <SearchInput value={search} onChange={setSearch} placeholder="Buscar..." />
 
       {loading ? (
         <LoadingList />

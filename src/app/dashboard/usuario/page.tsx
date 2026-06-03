@@ -365,9 +365,15 @@ export default function DashboardUsuarioPage() {
   }, [fetchPedidos]);
 
 
+  const prioridade = (p: PedidoReserva) => {
+    if (p.status === 'EM_ANDAMENTO') return 0;
+    if (getAcoes(p).podeCheckin) return 1;
+    return 2;
+  };
+
   const ativos = meusPedidos
     .filter(p => STATUS_ATIVOS.includes(p.status))
-    .sort((a, b) => new Date(a.inicioPrevisto).getTime() - new Date(b.inicioPrevisto).getTime());
+    .sort((a, b) => prioridade(a) - prioridade(b) || new Date(a.inicioPrevisto).getTime() - new Date(b.inicioPrevisto).getTime());
 
   const emAndamento = ativos.filter(p => p.status === 'EM_ANDAMENTO');
   const aguardandoCheckin = ativos.filter(p => getAcoes(p).podeCheckin);

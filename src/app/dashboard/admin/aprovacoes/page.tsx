@@ -282,9 +282,6 @@ export default function AprovacoesPage() {
       {/* Header */}
       <div>
         <h1 className="page-title">Aprovações Pendentes</h1>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          Histórico total de solicitações aguardando sua decisão administrativa.
-        </p>
       </div>
 
       {/* Filtros e Barra de Pesquisa */}

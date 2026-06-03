@@ -282,7 +282,7 @@ export default function AdminDashboard() {
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-sm font-medium text-[var(--text-secondary)]">Computadores in use</span>
+              <span className="text-sm font-medium text-[var(--text-secondary)]">Computadores em uso</span>
             </div>
             <div className="flex items-end gap-2">
               <span className="text-4xl font-bold text-[var(--text-primary)]">{loadingGlobal ? '—' : emUsoPC}</span>
@@ -406,7 +406,7 @@ export default function AdminDashboard() {
                   return (
                     <button key={p.id} onClick={() => setSelectedPedido(p)}
                       className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors gap-3 text-left ${checkinPendente
-                        ? 'bg-amber-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/20'
+                        ? 'bg-amber-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/20'
                         : 'bg-[var(--surface-2)] hover:bg-[var(--border)]'
                         }`}>
                       <div className="flex items-center gap-3 min-w-0">
@@ -442,24 +442,23 @@ export default function AdminDashboard() {
       {/* Links de gerenciamento */}
       <div className="grid sm:grid-cols-3 gap-4">
         <Link href="/dashboard/admin/gerenciar-salas"
-          className="card p-5 border-2 border-violet-200 dark:border-violet-800 hover:border-violet-400 hover:shadow-md transition-all">
-          <div className="text-2xl mb-2">🏫</div>
+          className="card p-4 flex flex-col items-center justify-center text-center border-2 border-violet-200 dark:border-violet-800 hover:border-violet-400 hover:shadow-md transition-all">
           <p className="font-semibold text-[var(--text-primary)]">Gerenciar Salas</p>
           <p className="text-sm text-[var(--text-muted)] mt-1">
             {allSalas.length} sala{allSalas.length !== 1 ? 's' : ''} cadastrada{allSalas.length !== 1 ? 's' : ''}
           </p>
         </Link>
+
         <Link href="/dashboard/admin/gerenciar-pcs"
-          className="card p-5 border-2 border-blue-200 dark:border-blue-800 hover:border-blue-400 hover:shadow-md transition-all">
-          <div className="text-2xl mb-2">💻</div>
+          className="card p-4 flex flex-col items-center justify-center text-center border-2 border-blue-200 dark:border-blue-800 hover:border-blue-400 hover:shadow-md transition-all">
           <p className="font-semibold text-[var(--text-primary)]">Gerenciar PCs</p>
           <p className="text-sm text-[var(--text-muted)] mt-1">
             {allPcs.length} computador{allPcs.length !== 1 ? 'es' : ''} cadastrado{allPcs.length !== 1 ? 's' : ''}
           </p>
         </Link>
+
         <Link href="/dashboard/admin/usuarios-admin"
-          className="card p-5 border-2 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 hover:shadow-md transition-all">
-          <div className="text-2xl mb-2">👥</div>
+          className="card p-4 flex flex-col items-center justify-center text-center border-2 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 hover:shadow-md transition-all">
           <p className="font-semibold text-[var(--text-primary)]">Gerenciar Usuários</p>
           <p className="text-sm text-[var(--text-muted)] mt-1">
             {usersCount} usuário{usersCount !== 1 ? 's' : ''} cadastrado{usersCount !== 1 ? 's' : ''}

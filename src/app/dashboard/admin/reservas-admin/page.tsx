@@ -214,17 +214,17 @@ function DetalheModal({ pedido, aprovacoes, onClose, onRefresh }: {
             {podeAprovar && (
               <div className="space-y-2">
                 <label className="text-xs font-medium text-[var(--text-secondary)]">Motivo da Decisão administrativa</label>
-                <input 
-                  type="text" 
-                  className="input-field text-sm" 
+                <input
+                  type="text"
+                  className="input-field text-sm"
                   placeholder="Justificativa para o usuário (opcional)"
-                  value={motivo} 
+                  value={motivo}
                   onChange={e => setMotivo(e.target.value)}
                   disabled={!!acting}
                 />
                 <div className="flex gap-2">
-                  <button 
-                    onClick={() => handleAprovacao('rejeitar')} 
+                  <button
+                    onClick={() => handleAprovacao('rejeitar')}
                     disabled={!!acting}
                     className="btn-danger flex-1 h-10 flex items-center justify-center gap-2 text-sm"
                   >
@@ -232,8 +232,8 @@ function DetalheModal({ pedido, aprovacoes, onClose, onRefresh }: {
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : '✕ Rejeitar'}
                   </button>
-                  <button 
-                    onClick={() => handleAprovacao('aprovar')} 
+                  <button
+                    onClick={() => handleAprovacao('aprovar')}
                     disabled={!!acting}
                     className="btn-success flex-1 h-10 flex items-center justify-center gap-2 text-sm"
                   >
@@ -245,8 +245,8 @@ function DetalheModal({ pedido, aprovacoes, onClose, onRefresh }: {
               </div>
             )}
             {podeCancelar && !podeAprovar && (
-              <button 
-                onClick={handleCancelar} 
+              <button
+                onClick={handleCancelar}
                 disabled={!!acting}
                 className="btn-danger w-full h-10 flex items-center justify-center gap-2 text-sm font-medium"
               >
@@ -276,7 +276,7 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () =>
   const encerrado = STATUS_ENCERRADAS.includes(pedido.status);
 
   return (
-    <div 
+    <div
       onClick={onClick}
       className={`px-5 py-4 cursor-pointer hover:bg-[var(--surface-2)] transition-colors ${encerrado ? 'opacity-50' : ''}`}
     >
@@ -328,15 +328,16 @@ function ReservasAdminPageContent() {
   const [todosPedidos, setTodosPedidos] = useState<PedidoReserva[]>([]);
   const [aprovacoes, setAprovacoes] = useState<AprovacaoReserva[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Estados de Filtro
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusReserva | ''>('');
   const [periodo, setPeriodo] = useState<PeriodoOpcao>('HOJE');
-  
+
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
   const [dataCustomizada, setDataCustomizada] = useState(dataParam ?? today);
   const [pedidoSelecionado, setPedidoSelecionado] = useState<PedidoReserva | null>(null);
+  const [dataCustomizadaFim, setDataCustomizadaFim] = useState(today);
 
   // Função unificada de busca que conversa com o back-end inteligente
   const buscarFiltrado = async () => {
@@ -362,7 +363,12 @@ function ReservasAdminPageContent() {
         params.dataInicio = primeiroDia.toISOString().split('T')[0];
         params.dataFim = ultimoDia.toISOString().split('T')[0];
       } else if (periodo === 'CUSTOMIZADO') {
-        params.data = dataCustomizada || undefined;
+        if (dataCustomizada && dataCustomizadaFim) {
+          params.dataInicio = dataCustomizada;
+          params.dataFim = dataCustomizadaFim;
+        } else if (dataCustomizada) {
+          params.data = dataCustomizada;
+        }
       }
 
       const [ped, ap] = await Promise.all([
@@ -382,7 +388,7 @@ function ReservasAdminPageContent() {
   // Dispara a busca no banco sempre que qualquer filtro mudar
   useEffect(() => {
     buscarFiltrado();
-  }, [periodo, dataCustomizada, statusFilter, search]);
+  }, [periodo, dataCustomizada, dataCustomizadaFim, statusFilter, search]);
 
   // Filtra localmente apenas o Chaveamento de Abas (Tabs) para performance instantânea
   const pedidosFiltrados = useMemo(() => {
@@ -406,7 +412,7 @@ function ReservasAdminPageContent() {
           <h1 className="page-title">Todas as Reservas</h1>
           <p className="text-sm text-[var(--text-muted)]">
             {pedidosFiltrados.length} resultado{pedidosFiltrados.length !== 1 ? 's' : ''}
-            {(statusFilter || search || periodo !== 'HOJE') ? ' (filtrado via servidor)' : ''}
+            {(statusFilter || search || periodo !== 'HOJE') ? ' encontrados' : ''}
           </p>
         </div>
         <Link href="/dashboard/usuario/reservar" className="btn-primary w-full sm:w-auto flex items-center justify-center gap-2">
@@ -448,17 +454,17 @@ function ReservasAdminPageContent() {
       {/* Filtros Modernizados */}
       <div className="grid grid-cols-1 sm:flex gap-3 flex-wrap items-center">
         {/* Campo de Busca Global */}
-        <input 
+        <input
           type="text"
           placeholder="Buscar no período (Nome, e-mail, sala, PC)..."
-          value={search} 
+          value={search}
           onChange={e => setSearch(e.target.value)}
-          className="input-field flex-1 sm:max-w-xs" 
+          className="input-field flex-1 sm:max-w-xs"
         />
-        
+
         {/* Filtro de Status */}
-        <select 
-          value={statusFilter} 
+        <select
+          value={statusFilter}
           onChange={e => setStatusFilter(e.target.value as StatusReserva | '')}
           className="input-field sm:max-w-[200px]"
         >
@@ -479,12 +485,22 @@ function ReservasAdminPageContent() {
 
         {/* Input de Data condicional (só aparece se escolher "Data Específica") */}
         {periodo === 'CUSTOMIZADO' && (
-          <div className="flex items-center gap-2 w-full sm:w-auto animation-fade-in">
-            <input 
-              type="date" 
-              value={dataCustomizada} 
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <input
+              type="date"
+              value={dataCustomizada}
               onChange={e => setDataCustomizada(e.target.value)}
-              className="input-field flex-1 sm:max-w-[160px]" 
+              className="input-field sm:max-w-[160px]"
+              placeholder="Data início"
+            />
+            <span className="text-xs text-[var(--text-muted)] shrink-0">até</span>
+            <input
+              type="date"
+              value={dataCustomizadaFim}
+              onChange={e => setDataCustomizadaFim(e.target.value)}
+              min={dataCustomizada}
+              className="input-field sm:max-w-[160px]"
+              placeholder="Data fim"
             />
           </div>
         )}
