@@ -6,8 +6,6 @@ import { useRouter } from 'next/navigation';
 import { PasswordInput } from '@/app/components/ui/PasswordInput';
 import { CodigoInput } from '@/app/components/ui/CodigoInput';
 
-
-
 export default function RecuperarSenhaPage() {
     const [email, setEmail] = useState('');
     const [codigo, setCodigo] = useState('');
@@ -28,6 +26,7 @@ export default function RecuperarSenhaPage() {
     const senhasNaoCoincidem =
         confirmarSenha.length > 0 && novaSenha !== confirmarSenha;
 
+    // Gerenciador do cronômetro de reenvio e expiração
     useEffect(() => {
         if (tempoRestante <= 0 && tempoReenvio <= 0) {
             if (intervalRef.current) {
@@ -58,47 +57,59 @@ export default function RecuperarSenhaPage() {
     const validarEmail = (value: string) =>
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+    // Etapa 1: Enviar código com Trava de Segurança de 2 segundos contra bugs
     const handleEnviarCodigo = async () => {
         setMensagem('');
         setErro('');
         const emailTrimmed = email.trim();
+        
         if (!emailTrimmed) { setErro('Informe seu e-mail.'); return; }
         if (!validarEmail(emailTrimmed)) { setErro('E-mail inválido.'); return; }
-        setLoading(true);
+        
+        // Transição visual instantânea para a Etapa 2
+        setEmailEnviado(emailTrimmed);
+        setMostrarEtapa2(true);
+        setTempoReenvio(60); 
+        setTempoRestante(900); // 15 minutos estimados padrão
+
+        setLoading(true); // Bloqueia e-mail e botão por segurança
+
         try {
-            const res = await auth.solicitarRecuperacao({ email: emailTrimmed });
-            setMensagem(res.message);
-            setEmailEnviado(emailTrimmed);
-            const expiresAt = new Date(res.expiresAt).getTime();
-            setTempoRestante(Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)));
-            setTempoReenvio(30);
-            setMostrarEtapa2(true);
+            await auth.solicitarRecuperacao({ email: emailTrimmed });
         } catch (e: unknown) {
-            console.error('Erro ao solicitar recuperação:', e);
-            setErro(e instanceof Error ? e.message : 'Erro ao solicitar recuperação de senha.');
+            console.error('Erro de conexão/servidor:', e);
+            setErro('Não foi possível conectar ao servidor. Tente novamente.');
+        } finally {
+            // FORÇA O LOCKOUT DE 2 SEGUNDOS
+            setTimeout(() => {
+                setLoading(false); // Destrava o campo de e-mail após 2 segundos exatos
+            }, 2000);
         }
-        setLoading(false);
     };
 
+    // Etapa 2: Validar código e alterar senha
     const handleAlterarSenha = async () => {
         setMensagem('');
         setErro('');
         const codigoTrimmed = codigo.trim();
         const emailTrimmed = email.trim();
+        
         if (codigoTrimmed.length !== 8) { setErro('Código inválido.'); return; }
         if (novaSenha.length < 8) { setErro('A senha deve ter no mínimo 8 caracteres.'); return; }
         if (novaSenha.length > 18) { setErro('A senha deve ter no máximo 18 caracteres.'); return; }
         if (novaSenha !== confirmarSenha) { setErro('As senhas não coincidem.'); return; }
+        
         setLoading(true);
         try {
             await auth.alterarSenha({ email: emailTrimmed, codigo: codigoTrimmed, novaSenha });
-            setMensagem('Senha alterada com sucesso!');
+            setMensagem('Senha alterada com sucesso! Redirecionando...');
             setTimeout(() => router.push('/login'), 2000);
         } catch (error) {
             console.error('Erro ao alterar senha:', error);
             setErro(error instanceof Error ? error.message : 'Erro ao alterar senha.');
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const getLabelBotaoEnviar = () => {
@@ -129,12 +140,23 @@ export default function RecuperarSenhaPage() {
 
                 <div className="card p-8 space-y-5">
                     <div>
-                        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Recuperar senha</h2>
-                        <p className="text-sm text-[var(--text-muted)] mt-1">
-                            {mostrarEtapa2
-                                ? 'Digite o código recebido e sua nova senha.'
-                                : 'Informe seu e-mail para receber o código de recuperação.'}
-                        </p>
+                        <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Recuperar senha</h2>
+                        
+                        {/* CARD VERDE POSICIONADO NO TOPO DINAMICAMENTE */}
+                        {mostrarEtapa2 ? (
+                            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 animate-fade-in my-2">
+                                <svg className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                <p className="text-xs text-emerald-700 dark:text-emerald-400 leading-relaxed">
+                                    Se o e-mail <strong>{emailEnviado}</strong> estiver cadastrado em nosso sistema, um código de verificação foi enviado para ele.
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-[var(--text-muted)] mt-1">
+                                Informe seu e-mail institucional para receber o código de recuperação.
+                            </p>
+                        )}
                     </div>
 
                     <div>
@@ -142,12 +164,11 @@ export default function RecuperarSenhaPage() {
                         <div className="flex gap-2">
                             <input
                                 type="email"
-                                className="input-field flex-1"
+                                className="input-field flex-1 disabled:opacity-60 transition-all text-sm"
                                 placeholder="seu@email.com"
                                 value={email}
                                 onChange={e => {
                                     setEmail(e.target.value);
-                                    // se mudar o email depois de já ter enviado, volta para etapa 1
                                     if (mostrarEtapa2) {
                                         setMostrarEtapa2(false);
                                         setCodigo('');
@@ -157,6 +178,7 @@ export default function RecuperarSenhaPage() {
                                         setTempoReenvio(0);
                                         setEmailEnviado('');
                                         setMensagem('');
+                                        setErro('');
                                     }
                                 }}
                                 disabled={loading}
@@ -164,30 +186,18 @@ export default function RecuperarSenhaPage() {
                             <button
                                 onClick={handleEnviarCodigo}
                                 disabled={tempoReenvio > 0 || loading}
-                                className="btn-primary shrink-0 px-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="btn-primary shrink-0 px-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
+                                {loading && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                                 {getLabelBotaoEnviar()}
                             </button>
                         </div>
                     </div>
 
-                    {mostrarEtapa2 && emailEnviado && (
-                        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                            <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                            <p className="text-sm text-blue-600 dark:text-blue-400">
-                                Código enviado para <strong>{emailEnviado}</strong>
-                            </p>
-                        </div>
-                    )}
-
                     {mostrarEtapa2 && (
-                        <div className="space-y-4">
+                        <div className="space-y-4 pt-2 animate-fade-in">
                             <div>
                                 <label className="label mb-2 block">Código de verificação</label>
-                                {/* Aqui está o novo input de código em risquinhos */}
                                 <CodigoInput
                                     value={codigo}
                                     onChange={setCodigo}
@@ -239,14 +249,20 @@ export default function RecuperarSenhaPage() {
                                 disabled={loading || tempoRestante <= 0 || senhasNaoCoincidem || codigo.length !== 8}
                                 className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {loading
-                                    ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Alterando...</>
-                                    : 'Alterar senha'}
+                                {loading ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Alterando...
+                                    </>
+                                ) : (
+                                    'Alterar senha'
+                                )}
                             </button>
                         </div>
                     )}
 
-                    {mensagem && (
+                    {/* Mensagens de feedback gerais (Sucesso de alteração de senha e Erros críticos) */}
+                    {mensagem && !mostrarEtapa2 && (
                         <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
                             <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

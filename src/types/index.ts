@@ -177,3 +177,28 @@ export interface TrocarSenhaDTO {
   senhaAtual: string;
   novaSenha: string;
 }
+
+
+
+// ─── Relatórios ──────────────────────────────────────────────────────────────
+export interface RelatorioRecursoDTO {
+  id: number;
+  nome: string;
+  totalMinutosUsados: number;
+  totalReservasFinalizadas: number;
+}
+
+export interface RelatorioStatusReservasDTO {
+  finalizadas: number;
+  canceladas: number;
+  atrasadas: number;
+  rejeitadas: number;
+  total: number;
+}
+
+export interface RelatorioHeatmapDTO {
+  diaSemana: number;
+  hora: number;
+  total: number;
+  media: number;
+}

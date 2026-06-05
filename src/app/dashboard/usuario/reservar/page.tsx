@@ -16,13 +16,13 @@ import { Alert } from '@/app/components/ui/ErrorAlert';
 import { LoadingList } from '@/app/components/ui/LoadingList';
 import { EmptyState } from '@/app/components/ui/EmptyState';
 import { maskCpf } from '@/lib/utils';
+import { HORA_ABERTURA, HORA_FECHAMENTO } from '@/lib/constants';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 type Tipo = 'computador' | 'sala';
 const DURACAO = 45;
-const HORA_INICIO = 7;
-const HORA_FIM = 22;
+
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -52,9 +52,9 @@ function toISOLocal(d: Date): string {
 function gerarBlocos(dia: Date): Date[] {
   const blocos: Date[] = [];
   const cursor = new Date(dia);
-  cursor.setHours(HORA_INICIO, 0, 0, 0);
+  cursor.setHours(HORA_ABERTURA, 0, 0, 0);
   const limite = new Date(dia);
-  limite.setHours(HORA_FIM, 0, 0, 0);
+  limite.setHours(HORA_FECHAMENTO, 0, 0, 0);
   while (addMin(cursor, DURACAO) <= limite) {
     blocos.push(new Date(cursor));
     cursor.setMinutes(cursor.getMinutes() + DURACAO);
@@ -115,7 +115,11 @@ function diasDoMes(mes: Date, hoje: Date): Date[] {
   const diaInicio = isMesAtual ? hoje.getDate() : 1;
   const dias: Date[] = [];
   for (let d = diaInicio; d <= totalDias; d++) {
-    dias.push(new Date(ano, m, d));
+    const dia = new Date(ano, m, d);
+    const diaSemana = dia.getDay();
+    if (diaSemana !== 0 && diaSemana !== 6) { // 0=domingo, 6=sábado
+      dias.push(dia);
+    }
   }
   return dias;
 }
@@ -213,9 +217,9 @@ function SeletorDia({
     new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1),
     hoje
   ) || (
-    mesAtual.getFullYear() === hoje.getFullYear() &&
-    mesAtual.getMonth() === hoje.getMonth()
-  );
+      mesAtual.getFullYear() === hoje.getFullYear() &&
+      mesAtual.getMonth() === hoje.getMonth()
+    );
 
   const irParaMes = (dir: -1 | 1) => {
     const novo = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + dir, 1);
@@ -271,18 +275,16 @@ function SeletorDia({
               key={key}
               type="button"
               onClick={() => onSelecionar(key)}
-              className={`shrink-0 w-[52px] py-2 rounded-xl border-2 text-center transition-all ${
-                sel
+              className={`shrink-0 w-[52px] py-2 rounded-xl border-2 text-center transition-all ${sel
                   ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
                   : 'border-[var(--border)] hover:border-blue-300'
-              }`}
+                }`}
             >
               <p className={`text-[10px] font-medium ${sel ? 'text-blue-600' : 'text-[var(--text-muted)]'}`}>
                 {isHoje ? 'Hoje' : SEMANA_ABREV[dia.getDay()]}
               </p>
-              <p className={`text-base font-bold leading-tight ${
-                sel ? 'text-blue-700 dark:text-blue-400' : 'text-[var(--text-primary)]'
-              } ${isHoje && !sel ? 'text-blue-600' : ''}`}>
+              <p className={`text-base font-bold leading-tight ${sel ? 'text-blue-700 dark:text-blue-400' : 'text-[var(--text-primary)]'
+                } ${isHoje && !sel ? 'text-blue-600' : ''}`}>
                 {dia.getDate()}
               </p>
               <p className={`text-[10px] ${sel ? 'text-blue-500' : 'text-[var(--text-muted)]'}`}>
@@ -454,11 +456,11 @@ export default function ReservarPage() {
   const precisaAprovacao = (() => {
     if (isAdmin) return false;
     if (tipo === 'computador') {
-        return itensSelecionados.length > 2 || maiorSequencia(blocosSelecionados) > BLOCOS_MAX_SEM_APROVACAO;
+      return itensSelecionados.length > 2 || maiorSequencia(blocosSelecionados) > BLOCOS_MAX_SEM_APROVACAO;
     } else {
-        return itensSelecionados.length > 1 || maiorSequencia(blocosSelecionados) > BLOCOS_MAX_SEM_APROVACAO;
+      return itensSelecionados.length > 1 || maiorSequencia(blocosSelecionados) > BLOCOS_MAX_SEM_APROVACAO;
     }
-})();
+  })();
   // ── Submit ──────────────────────────────────────────────────────────────────
 
   const handleSubmit = async (e: React.FormEvent) => {

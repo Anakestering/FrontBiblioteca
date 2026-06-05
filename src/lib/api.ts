@@ -8,6 +8,9 @@ import {
   PedidoReservaDTO,
   PedidoReserva,
   RecuperacaoSolicitacaoDTO, RecuperarSenhaDTO, TrocarSenhaDTO,
+  RelatorioRecursoDTO,
+  RelatorioStatusReservasDTO,
+  RelatorioHeatmapDTO,
 } from '@/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -181,4 +184,40 @@ export const usuarios = {
   trocarSenha: (dto: TrocarSenhaDTO) =>
     request<{ message: string }>('/usuarios/me/senha', { method: 'PATCH', body: JSON.stringify(dto) }),
   stats: () => request<{ total: number; ativos: number; cadastradosNaSemana: number }>('/usuarios/stats'),
+};
+
+
+// ─── Relatórios ───────────────────────────────────────────────────────────────
+export const relatorios = {
+  salas: (params: { inicio?: string; fim?: string; salaIds: number[] }) => {
+    const query = new URLSearchParams();
+    if (params.inicio) query.set('inicio', params.inicio);
+    if (params.fim) query.set('fim', params.fim);
+    params.salaIds.forEach(id => query.append('salaIds', String(id)));
+    return request<RelatorioRecursoDTO[]>(`/relatorios/salas/recursos?${query}`);
+  },
+
+  computadores: (params: { inicio?: string; fim?: string; computadorIds: number[] }) => {
+    const query = new URLSearchParams();
+    if (params.inicio) query.set('inicio', params.inicio);
+    if (params.fim) query.set('fim', params.fim);
+    params.computadorIds.forEach(id => query.append('computadorIds', String(id)));
+    return request<RelatorioRecursoDTO[]>(`/relatorios/computadores/recursos?${query}`);
+  },
+
+  status: (params: { inicio?: string; fim?: string; salaIds: number[]; computadorIds: number[] }) => {
+    const query = new URLSearchParams();
+    if (params.inicio) query.set('inicio', params.inicio);
+    if (params.fim) query.set('fim', params.fim);
+    params.salaIds.forEach(id => query.append('salaIds', String(id)));
+    params.computadorIds.forEach(id => query.append('computadorIds', String(id)));
+    return request<RelatorioStatusReservasDTO>(`/relatorios/status-reservas?${query}`);
+  },
+
+  heatmap: (params: { inicio?: string; fim?: string }) => {
+  const query = new URLSearchParams();
+  if (params.inicio) query.set('inicio', params.inicio);
+  if (params.fim) query.set('fim', params.fim);
+  return request<RelatorioHeatmapDTO[]>(`/relatorios/heatmap?${query}`);
+},
 };

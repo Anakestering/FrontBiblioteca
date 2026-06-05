@@ -8,6 +8,9 @@ import { formatDate, formatTime } from '@/lib/utils';
 import { StatusBadge } from '@/app/components/ui/StatusBadge';
 import { CountdownCheckin } from '@/app/components/ui/CountdownCheckin';
 import { CheckinCheckoutInfo } from '@/app/components/ui/CheckinCheckoutInfo';
+import { LoadingList } from '@/app/components/ui/LoadingList';
+import { Alert } from '@/app/components/ui/ErrorAlert';
+import { Modal } from '@/app/components/ui/Modal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -91,153 +94,137 @@ function PedidoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-[#161b22] rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+    <Modal
+      title={
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-bold px-2 py-0.5 rounded ${isPc
+            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+            : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
+            {isPc ? 'COMPUTADOR' : 'SALA'}
+          </span>
+          <StatusBadge status={pedido.status} />
+        </div>
+      }
+      onClose={onClose}
+    >
+      <div className="space-y-4">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <div className="flex items-center gap-2">
-            <span className={`text-xs font-bold px-2 py-0.5 rounded ${isPc
-              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-              : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
-              {isPc ? 'COMPUTADOR' : 'SALA'}
-            </span>
-            <StatusBadge status={pedido.status} />
+        {/* Itens reservados */}
+        <div>
+          <p className="text-xs text-[var(--text-muted)] mb-2">{isPc ? 'Computadores' : 'Salas'}</p>
+          <div className="flex flex-wrap gap-2">
+            {itens.map((item, i) => (
+              <span key={i} className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${isPc
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-mono'
+                : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'}`}>
+                {item.nome}
+              </span>
+            ))}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)]">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-6 space-y-4">
-
-          {/* Itens reservados */}
-          <div>
-            <p className="text-xs text-[var(--text-muted)] mb-2">{isPc ? 'Computadores' : 'Salas'}</p>
-            <div className="flex flex-wrap gap-2">
-              {itens.map((item, i) => (
-                <span key={i} className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${isPc
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-mono'
-                  : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'}`}>
-                  {item.nome}
-                </span>
-              ))}
-            </div>
+        {/* Data e horário previsto */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{formatDate(pedido.inicioPrevisto)}</p>
           </div>
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Horário previsto</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {formatTime(pedido.inicioPrevisto)} → {formatTime(pedido.fimPrevisto)}
+            </p>
+          </div>
+          <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+            <p className="text-xs text-[var(--text-muted)] mb-1">Pessoas</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.qtdePessoas}</p>
+          </div>
+          {pedido.observacao && (
+            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
+              <p className="text-xs text-[var(--text-muted)] mb-1">Observação</p>
+              <p className="text-sm text-[var(--text-secondary)] truncate">{pedido.observacao}</p>
+            </div>
+          )}
+        </div>
 
-          {/* Data e horário previsto */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Data</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{formatDate(pedido.inicioPrevisto)}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Horário previsto</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatTime(pedido.inicioPrevisto)} → {formatTime(pedido.fimPrevisto)}
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Pessoas</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{pedido.qtdePessoas}</p>
-            </div>
-            {pedido.observacao && (
-              <div className="p-3 rounded-xl bg-[var(--surface-2)]">
-                <p className="text-xs text-[var(--text-muted)] mb-1">Observação</p>
-                <p className="text-sm text-[var(--text-secondary)] truncate">{pedido.observacao}</p>
-              </div>
+        {/* Check-in / Check-out realizados */}
+        <CheckinCheckoutInfo
+          checkinEm={primeiraReserva?.checkinEm}
+          checkoutEm={primeiraReserva?.checkoutEm}
+        />
+
+        {/* Aviso check-in expirado */}
+        {checkinExpirou && (
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
+            <p className="text-sm text-rose-600 dark:text-rose-400">
+              ⚠️ Prazo de check-in encerrado. Esta reserva será marcada como atrasada.
+            </p>
+          </div>
+        )}
+
+        {/* Aviso check-in ainda não disponível */}
+        {pedido.status === 'APROVADA' && !podeCheckin && !checkinExpirou && minParaCheckin > 0 && (
+          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Check-in disponível 5 min antes do início.
+            </p>
+            <CountdownCheckin inicioPrevisto={pedido.inicioPrevisto} />
+          </div>
+        )}
+
+        {/* Feedback */}
+        <Alert message={success} type="success" />
+        <Alert message={error} />
+
+        {/* Ações */}
+        {(podeCheckin || podeCheckout || podeCancelar) && (
+          <div className="space-y-2 pt-2 border-t border-[var(--border)]">
+            {podeCheckin && (
+              <button onClick={() => handle('checkin')} disabled={!!acting}
+                className="btn-success w-full flex items-center justify-center gap-2">
+                {acting === 'checkin'
+                  ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                  </svg>}
+                {acting === 'checkin' ? 'Fazendo check-in...' : 'Fazer Check-in'}
+              </button>
+            )}
+            {podeCheckout && (
+              <button onClick={() => handle('checkout')} disabled={!!acting}
+                className="btn-primary w-full flex items-center justify-center gap-2">
+                {acting === 'checkout'
+                  ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>}
+                {acting === 'checkout' ? 'Fazendo check-out...' : 'Fazer Check-out'}
+              </button>
+            )}
+            {podeCancelar && (
+              <button
+                onClick={() => handle('cancelar')}
+                disabled={!!acting}
+                className="btn-danger w-full flex items-center justify-center gap-2">
+                {acting === 'cancelar'
+                  ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>}
+                {acting === 'cancelar' ? 'Cancelando...' : 'Cancelar Reserva'}
+              </button>
             )}
           </div>
+        )}
 
-          {/* Check-in / Check-out realizados */}
-          <CheckinCheckoutInfo
-            checkinEm={primeiraReserva?.checkinEm}
-            checkoutEm={primeiraReserva?.checkoutEm}
-          />
+        {['APROVADA', 'PENDENTE_APROVACAO'].includes(pedido.status) && !podeCancelar && (
+          <p className="text-xs text-[var(--text-muted)] text-center pt-1">
+            Cancelamento disponível somente até 1h antes do início.
+          </p>
+        )}
 
-          {/* Aviso check-in expirado */}
-          {checkinExpirou && (
-            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
-              <p className="text-sm text-rose-600 dark:text-rose-400">
-                ⚠️ Prazo de check-in encerrado. Esta reserva será marcada como atrasada.
-              </p>
-            </div>
-          )}
-
-          {/* Aviso check-in ainda não disponível */}
-          {pedido.status === 'APROVADA' && !podeCheckin && !checkinExpirou && minParaCheckin > 0 && (
-            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                Check-in disponível 5 min antes do início.
-              </p>
-              <CountdownCheckin inicioPrevisto={pedido.inicioPrevisto} />
-            </div>
-          )}
-
-          {/* Feedback */}
-          {success && (
-            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
-              <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{success}</p>
-            </div>
-          )}
-          {error && (
-            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
-              <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
-            </div>
-          )}
-
-          {/* Ações */}
-          {(podeCheckin || podeCheckout || podeCancelar) && (
-            <div className="space-y-2 pt-2 border-t border-[var(--border)]">
-              {podeCheckin && (
-                <button onClick={() => handle('checkin')} disabled={!!acting}
-                  className="btn-success w-full flex items-center justify-center gap-2">
-                  {acting === 'checkin'
-                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                    </svg>}
-                  {acting === 'checkin' ? 'Fazendo check-in...' : 'Fazer Check-in'}
-                </button>
-              )}
-              {podeCheckout && (
-                <button onClick={() => handle('checkout')} disabled={!!acting}
-                  className="btn-primary w-full flex items-center justify-center gap-2">
-                  {acting === 'checkout'
-                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>}
-                  {acting === 'checkout' ? 'Fazendo check-out...' : 'Fazer Check-out'}
-                </button>
-              )}
-              {podeCancelar && (
-                <button
-                  onClick={() => { if (confirm('Cancelar esta reserva? Esta ação não pode ser desfeita.')) handle('cancelar'); }}
-                  disabled={!!acting}
-                  className="btn-danger w-full flex items-center justify-center gap-2">
-                  {acting === 'cancelar'
-                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>}
-                  {acting === 'cancelar' ? 'Cancelando...' : 'Cancelar Reserva'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {['APROVADA', 'PENDENTE_APROVACAO'].includes(pedido.status) && !podeCancelar && (
-            <p className="text-xs text-[var(--text-muted)] text-center pt-1">
-              Cancelamento disponível somente até 1h antes do início.
-            </p>
-          )}
-        </div>
       </div>
-    </div>
+    </Modal >
   );
 }
 
@@ -333,7 +320,9 @@ export default function DashboardUsuarioPage() {
     try {
       const lista = await pedidosApi.meus();
       setMeusPedidos(lista);
-    } catch (_) { }
+    } catch (err) {
+      console.error('Erro ao carregar pedidos:', err);
+    }
     setLoading(false);
   }, []);
 
@@ -365,15 +354,9 @@ export default function DashboardUsuarioPage() {
   }, [fetchPedidos]);
 
 
-  const prioridade = (p: PedidoReserva) => {
-    if (p.status === 'EM_ANDAMENTO') return 0;
-    if (getAcoes(p).podeCheckin) return 1;
-    return 2;
-  };
-
   const ativos = meusPedidos
     .filter(p => STATUS_ATIVOS.includes(p.status))
-    .sort((a, b) => prioridade(a) - prioridade(b) || new Date(a.inicioPrevisto).getTime() - new Date(b.inicioPrevisto).getTime());
+    .sort((a, b) => new Date(a.inicioPrevisto).getTime() - new Date(b.inicioPrevisto).getTime());
 
   const emAndamento = ativos.filter(p => p.status === 'EM_ANDAMENTO');
   const aguardandoCheckin = ativos.filter(p => getAcoes(p).podeCheckin);
@@ -436,9 +419,8 @@ export default function DashboardUsuarioPage() {
         </div>
 
         {loading ? (
-          <div className="card divide-y divide-[var(--border)]">
-            {[1, 2, 3].map(i => <div key={i} className="h-16 shimmer" />)}
-          </div>
+          <LoadingList items={4} />
+
         ) : ativos.length === 0 ? (
           <div className="card p-12 text-center">
             <svg className="w-10 h-10 text-[var(--text-muted)] mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
