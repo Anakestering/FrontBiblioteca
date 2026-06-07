@@ -181,14 +181,14 @@ export interface TrocarSenhaDTO {
 
 
 // ─── Relatórios ──────────────────────────────────────────────────────────────
-export interface RelatorioRecursoDTO {
+export interface EstatisticasRecursoDTO {
   id: number;
   nome: string;
   totalMinutosUsados: number;
   totalReservasFinalizadas: number;
 }
 
-export interface RelatorioStatusReservasDTO {
+export interface EstatisticasStatusReservasDTO {
   finalizadas: number;
   canceladas: number;
   atrasadas: number;
@@ -196,9 +196,11 @@ export interface RelatorioStatusReservasDTO {
   total: number;
 }
 
-export interface RelatorioHeatmapDTO {
+export interface EstatisticasHeatmapDTO {
   diaSemana: number;
   hora: number;
-  total: number;
+  totalPrimeiraMetade: number;
+  totalSegundaMetade: number;
+  valorParaCor: number;
   media: number;
 }

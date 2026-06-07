@@ -2,15 +2,15 @@ import {
   AuthDTO, AuthResponse, CadastroDTO,
   Computador, ComputadorDTO,
   Sala, SalaDTO,
-  ReservaComputador, 
-  ReservaSala, 
+  ReservaComputador,
+  ReservaSala,
   AprovacaoReserva, Usuario,
   PedidoReservaDTO,
   PedidoReserva,
   RecuperacaoSolicitacaoDTO, RecuperarSenhaDTO, TrocarSenhaDTO,
-  RelatorioRecursoDTO,
-  RelatorioStatusReservasDTO,
-  RelatorioHeatmapDTO,
+  EstatisticasHeatmapDTO,
+  EstatisticasStatusReservasDTO,
+  EstatisticasRecursoDTO,
 } from '@/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -92,8 +92,8 @@ export const computadores = {
 
 // ─── Salas ────────────────────────────────────────────────────────────────────
 export const salas = {
-  listar: () => request<Sala[]>('/salas'),               
-  listarTodas: () => request<Sala[]>('/salas/todas'),    
+  listar: () => request<Sala[]>('/salas'),
+  listarTodas: () => request<Sala[]>('/salas/todas'),
   buscar: (id: number) => request<Sala>(`/salas/${id}`),
   criar: (dto: SalaDTO) =>
     request<Sala>('/salas', { method: 'POST', body: JSON.stringify(dto) }),
@@ -156,7 +156,7 @@ export const pedidos = {
       query.set('dataInicio', params.dataInicio);
       query.set('dataFim', params.dataFim);
       return request<PedidoReserva[]>(`/pedidos/filtrar/periodo?${query.toString()}`);
-    } 
+    }
     // Se não é período, mas tem uma data específica, adiciona na query da rota comum
     if (params.data) {
       query.set('data', params.data);
@@ -187,14 +187,14 @@ export const usuarios = {
 };
 
 
-// ─── Relatórios ───────────────────────────────────────────────────────────────
+// ─── Estatisticas ───────────────────────────────────────────────────────────────
 export const relatorios = {
   salas: (params: { inicio?: string; fim?: string; salaIds: number[] }) => {
     const query = new URLSearchParams();
     if (params.inicio) query.set('inicio', params.inicio);
     if (params.fim) query.set('fim', params.fim);
     params.salaIds.forEach(id => query.append('salaIds', String(id)));
-    return request<RelatorioRecursoDTO[]>(`/relatorios/salas/recursos?${query}`);
+    return request<EstatisticasRecursoDTO[]>(`/estatisticas/salas/recursos?${query}`);
   },
 
   computadores: (params: { inicio?: string; fim?: string; computadorIds: number[] }) => {
@@ -202,7 +202,7 @@ export const relatorios = {
     if (params.inicio) query.set('inicio', params.inicio);
     if (params.fim) query.set('fim', params.fim);
     params.computadorIds.forEach(id => query.append('computadorIds', String(id)));
-    return request<RelatorioRecursoDTO[]>(`/relatorios/computadores/recursos?${query}`);
+    return request<EstatisticasRecursoDTO[]>(`/estatisticas/computadores/recursos?${query}`);
   },
 
   status: (params: { inicio?: string; fim?: string; salaIds: number[]; computadorIds: number[] }) => {
@@ -211,13 +211,21 @@ export const relatorios = {
     if (params.fim) query.set('fim', params.fim);
     params.salaIds.forEach(id => query.append('salaIds', String(id)));
     params.computadorIds.forEach(id => query.append('computadorIds', String(id)));
-    return request<RelatorioStatusReservasDTO>(`/relatorios/status-reservas?${query}`);
+    return request<EstatisticasStatusReservasDTO>(`/estatisticas/status-reservas?${query}`);
   },
 
   heatmap: (params: { inicio?: string; fim?: string }) => {
-  const query = new URLSearchParams();
-  if (params.inicio) query.set('inicio', params.inicio);
-  if (params.fim) query.set('fim', params.fim);
-  return request<RelatorioHeatmapDTO[]>(`/relatorios/heatmap?${query}`);
-},
+    const query = new URLSearchParams();
+    if (params.inicio) query.set('inicio', params.inicio);
+    if (params.fim) query.set('fim', params.fim);
+    return request<EstatisticasHeatmapDTO[]>(`/estatisticas/heatmap?${query}`);
+  },
+
+  historico: (params: { inicio?: string; fim?: string; agrupamento?: string }) => {
+    const query = new URLSearchParams();
+    if (params.inicio) query.set('inicio', params.inicio);
+    if (params.fim) query.set('fim', params.fim);
+    if (params.agrupamento) query.set('agrupamento', params.agrupamento);
+    return request<{ data: string; total: number }[]>(`/estatisticas/historico?${query}`);
+  },
 };

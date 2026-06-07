@@ -115,8 +115,8 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    href: '/dashboard/admin/relatorios',
-    label: 'Relatórios',
+    href: '/dashboard/admin/estatisticas',
+    label: 'Estatísticas',
     adminOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
