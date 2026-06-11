@@ -2,46 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
+import {
+  PeriodoFiltro,
+  PeriodoPreset,
+  calcularDatas,
+  detectarPeriodo,
+} from '@/lib/utils';
 
-export interface PeriodoFiltro {
-  inicio: Date | null;
-  fim: Date | null;
-}
+// Re-exporta para os componentes que importam daqui
+export type { PeriodoFiltro };
 
 interface Props {
   valor: PeriodoFiltro;
   loading?: boolean;
   onChange: (periodo: PeriodoFiltro) => void;
-  comBotaoAplicar?: boolean; // true = aplica só ao clicar; false = aplica ao selecionar
-}
-
-function calcularDatas(periodo: string): PeriodoFiltro {
-  const hoje = new Date();
-  if (periodo === 'semana') {
-    const seg = new Date(hoje);
-    seg.setDate(hoje.getDate() - hoje.getDay() + 1);
-    seg.setHours(0, 0, 0, 0);
-    return { inicio: seg, fim: hoje };
-  }
-  if (periodo === 'mes') return { inicio: new Date(hoje.getFullYear(), hoje.getMonth(), 1), fim: hoje };
-  if (periodo === 'ano') return { inicio: new Date(hoje.getFullYear(), 0, 1), fim: hoje };
-  return { inicio: null, fim: null };
-}
-
-function detectarPeriodo(valor: PeriodoFiltro): 'semana' | 'mes' | 'ano' | 'personalizado' {
-  if (!valor.inicio || !valor.fim) return 'personalizado';
-  const fmt   = (d: Date) => d.toDateString();
-  const sem   = calcularDatas('semana');
-  const mes   = calcularDatas('mes');
-  const ano   = calcularDatas('ano');
-  if (fmt(valor.inicio) === fmt(sem.inicio!)) return 'semana';
-  if (fmt(valor.inicio) === fmt(mes.inicio!)) return 'mes';
-  if (fmt(valor.inicio) === fmt(ano.inicio!)) return 'ano';
-  return 'personalizado';
+  comBotaoAplicar?: boolean;
 }
 
 export function FiltroPeriodoInline({ valor, loading, onChange, comBotaoAplicar = false }: Props) {
-  const [periodo, setPeriodo]       = useState<'semana' | 'mes' | 'ano' | 'personalizado'>(detectarPeriodo(valor));
+  const [periodo, setPeriodo]         = useState<PeriodoPreset>(detectarPeriodo(valor));
   const [rangeInicio, setRangeInicio] = useState<Date | null>(valor.inicio);
   const [rangeFim, setRangeFim]       = useState<Date | null>(valor.fim);
   const [pendente, setPendente]       = useState<PeriodoFiltro | null>(null);
@@ -55,15 +34,12 @@ export function FiltroPeriodoInline({ valor, loading, onChange, comBotaoAplicar 
   }, [valor.inicio?.getTime(), valor.fim?.getTime()]);
 
   const emitir = (novo: PeriodoFiltro) => {
-    if (comBotaoAplicar) {
-      setPendente(novo);
-    } else {
-      onChange(novo);
-    }
+    if (comBotaoAplicar) setPendente(novo);
+    else onChange(novo);
   };
 
   const handleSelect = (val: string) => {
-    const p = val as 'semana' | 'mes' | 'ano' | 'personalizado';
+    const p = val as PeriodoPreset;
     setPeriodo(p);
     if (p !== 'personalizado') {
       const novo = calcularDatas(p);

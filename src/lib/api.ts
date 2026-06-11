@@ -11,6 +11,9 @@ import {
   EstatisticasHeatmapDTO,
   EstatisticasStatusReservasDTO,
   EstatisticasRecursoDTO,
+  EstatisticasHistoricoDTO,
+  EstatisticasResumoDTO,
+  EstatisticasOcupacaoDiaDTO,
 } from '@/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -226,6 +229,20 @@ export const relatorios = {
     if (params.inicio) query.set('inicio', params.inicio);
     if (params.fim) query.set('fim', params.fim);
     if (params.agrupamento) query.set('agrupamento', params.agrupamento);
-    return request<{ data: string; total: number }[]>(`/estatisticas/historico?${query}`);
+    return request<EstatisticasHistoricoDTO>(`/estatisticas/historico?${query}`);
+  },
+
+  ocupacaoSemana: (params: { inicio?: string; fim?: string }) => {
+    const query = new URLSearchParams();
+    if (params.inicio) query.set('inicio', params.inicio);
+    if (params.fim) query.set('fim', params.fim);
+    return request<EstatisticasOcupacaoDiaDTO[]>(`/estatisticas/ocupacao-semana?${query}`);
+  },
+
+   resumo: (params: { inicio?: string; fim?: string }) => {
+    const query = new URLSearchParams();
+    if (params.inicio) query.set('inicio', params.inicio);
+    if (params.fim) query.set('fim', params.fim);
+    return request<EstatisticasResumoDTO>(`/estatisticas/resumo?${query}`);
   },
 };

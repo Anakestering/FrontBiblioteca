@@ -6,9 +6,10 @@ import { AbaHistorico } from './components/AbaHistorico/Page';
 import { AbaRecursos } from './components/AbaRecursos/page';
 import { AbaUsuarios } from './components/AbaUsuarios/page';
 import { AbaDownload } from './components/AbaRelatorio/page';
-import { FiltroPeriodoInline, PeriodoFiltro } from './components/FiltroPeriodoInline';
+import { FiltroPeriodoInline } from './components/FiltroPeriodoInline';
+import { PeriodoFiltro, toISOLocal } from '@/lib/utils';
 import { relatorios } from '@/lib/api';
-import { EstatisticasRecursoDTO, EstatisticasStatusReservasDTO, EstatisticasHeatmapDTO } from '@/types';
+import { EstatisticasRecursoDTO, EstatisticasStatusReservasDTO, EstatisticasHeatmapDTO, EstatisticasResumoDTO } from '@/types';
 import { salas as salasApi, computadores as computadoresApi } from '@/lib/api';
 import { Sala, Computador } from '@/types';
 
@@ -37,12 +38,6 @@ function getInicioSemana(): Date {
   return seg;
 }
 
-function toISOLocal(date: Date, endOfDay = false): string {
-  const d = new Date(date);
-  if (endOfDay) d.setHours(23, 59, 59, 999);
-  else d.setHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 19);
-}
 
 export default function EstatisticasPage() {
   const [aba, setAba] = useState<Aba>('historico');
@@ -66,6 +61,9 @@ export default function EstatisticasPage() {
   const [heatmapData, setHeatmapData]         = useState<EstatisticasHeatmapDTO[]>([]);
   const [loadingHeatmap, setLoadingHeatmap]   = useState(false);
   const [modoHeatmap, setModoHeatmap]         = useState<'media' | 'total'>('media');
+  const [salasDisponiveis, setSalasDisponiveis]             = useState<Sala[]>([]);
+  const [computadoresDisponiveis, setComputadoresDisponiveis] = useState<Computador[]>([]);
+
 
   const buscarHeatmap = useCallback(async (f: FiltrosRelatorio) => {
     setLoadingHeatmap(true);
@@ -108,6 +106,8 @@ export default function EstatisticasPage() {
     if (jaCarregou) return;
     setJaCarregou(true);
     Promise.all([salasApi.listar(), computadoresApi.listar()]).then(([s, c]) => {
+      setSalasDisponiveis(s);
+      setComputadoresDisponiveis(c);
       const f: FiltrosRelatorio = {
         inicio: getInicioSemana(),
         fim: new Date(),
@@ -174,7 +174,8 @@ export default function EstatisticasPage() {
         </div>
       </div>
 
-      {aba === 'historico' && (
+
+      <div style={{ display: aba === 'historico' ? undefined : 'none' }}>
         <AbaHistorico
           filtros={filtros}
           globalVersao={globalVersao}
@@ -184,8 +185,8 @@ export default function EstatisticasPage() {
           modoHeatmap={modoHeatmap}
           onModoHeatmap={setModoHeatmap}
         />
-      )}
-      {aba === 'recursos' && (
+      </div>
+      <div style={{ display: aba === 'recursos' ? undefined : 'none' }}>
         <AbaRecursos
           filtros={filtros}
           globalVersao={globalVersao}
@@ -193,10 +194,16 @@ export default function EstatisticasPage() {
           loading={loadingRecursos}
           erro={erroRecursos}
           onBuscarRecursos={buscarRecursos}
+          salasDisponiveis={salasDisponiveis}
+          computadoresDisponiveis={computadoresDisponiveis}
         />
-      )}
-      {aba === 'usuarios' && <AbaUsuarios />}
-      {aba === 'download' && <AbaDownload dados={dadosRecursos} filtros={filtros} />}
+      </div>
+      <div style={{ display: aba === 'usuarios' ? undefined : 'none' }}>
+        <AbaUsuarios />
+      </div>
+      <div style={{ display: aba === 'download' ? undefined : 'none' }}>
+        <AbaDownload dados={dadosRecursos} filtros={filtros} />
+      </div>
     </div>
   );
 }

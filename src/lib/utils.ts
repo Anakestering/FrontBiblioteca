@@ -110,9 +110,48 @@ export function formatHora(date: Date) {
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function toISOLocal(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+/**
+ * Serializa um Date para o formato ISO local sem fuso (yyyy-MM-ddTHH:mm:ss).
+ * - endOfDay=false (padrão) → zera a hora para 00:00:00 (início do dia)
+ * - endOfDay=true           → seta 23:59:59.999 (fim do dia)
+ * Usado por todos os endpoints de estatísticas.
+ */
+export function toISOLocal(d: Date, endOfDay = false): string {
+  const date = new Date(d);
+  if (endOfDay) date.setHours(23, 59, 59, 999);
+  else date.setHours(0, 0, 0, 0);
+  return date.toISOString().slice(0, 19);
+}
+
+// ─── Período helpers (compartilhado por FiltroPeriodoInline e FiltrosBarras) ──
+
+export interface PeriodoFiltro {
+  inicio: Date | null;
+  fim: Date | null;
+}
+
+export type PeriodoPreset = 'semana' | 'mes' | 'ano' | 'personalizado';
+
+export function calcularDatas(periodo: PeriodoPreset): PeriodoFiltro {
+  const hoje = new Date();
+  if (periodo === 'semana') {
+    const seg = new Date(hoje);
+    seg.setDate(hoje.getDate() - hoje.getDay() + 1);
+    seg.setHours(0, 0, 0, 0);
+    return { inicio: seg, fim: hoje };
+  }
+  if (periodo === 'mes') return { inicio: new Date(hoje.getFullYear(), hoje.getMonth(), 1), fim: hoje };
+  if (periodo === 'ano') return { inicio: new Date(hoje.getFullYear(), 0, 1), fim: hoje };
+  return { inicio: null, fim: null };
+}
+
+export function detectarPeriodo(valor: PeriodoFiltro): PeriodoPreset {
+  if (!valor.inicio || !valor.fim) return 'personalizado';
+  const fmt = (d: Date) => d.toDateString();
+  if (fmt(valor.inicio) === fmt(calcularDatas('semana').inicio!)) return 'semana';
+  if (fmt(valor.inicio) === fmt(calcularDatas('mes').inicio!))    return 'mes';
+  if (fmt(valor.inicio) === fmt(calcularDatas('ano').inicio!))    return 'ano';
+  return 'personalizado';
 }
 
 export function gerarBlocos(dia: Date): Date[] {

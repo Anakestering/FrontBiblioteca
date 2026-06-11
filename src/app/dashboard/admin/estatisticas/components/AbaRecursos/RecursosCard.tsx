@@ -2,11 +2,9 @@
 
 import { useState } from 'react';
 import { DadosRecursos, FiltrosRelatorio } from '../../page';
-import { minutosDisponiveisPeriodo } from '@/lib/constants';
 
 interface Props {
   dados: DadosRecursos;
-  filtros: FiltrosRelatorio;
 }
 
 interface TooltipState {
@@ -61,29 +59,29 @@ function calcPcts(valores: number[]): number[] {
   return result;
 }
 
-export function RecursosCard({ dados, filtros }: Props) {
-  const temPcs = dados.computadores.length > 0;
+export function RecursosCard({ dados }: Props) {
+  const temPcs   = dados.computadores.length > 0;
   const temSalas = dados.salas.length > 0;
   if (!temPcs && !temSalas) return null;
 
-  const disponivel = minutosDisponiveisPeriodo(filtros.inicio, filtros.fim);
   const unico = (temPcs && !temSalas) || (!temPcs && temSalas);
 
-  const pctsPcs = calcPcts(dados.computadores.map(c => c.totalMinutosUsados));
+  const pctsPcs   = calcPcts(dados.computadores.map(c => c.totalMinutosUsados));
   const pctsSalas = calcPcts(dados.salas.map(s => s.totalMinutosUsados));
 
   const [tooltip, setTooltip] = useState<TooltipState>({
     visivel: false, x: 0, y: 0, usado: 0, disponivelMin: 0, pctReal: 0,
   });
 
-  const handleMouseMove = (e: React.MouseEvent, usado: number, pctReal: number) => {
+  const handleMouseMove = (e: React.MouseEvent, usado: number, disponivel: number) => {
+    const pctReal = disponivel > 0 ? Math.min((usado / disponivel) * 100, 100) : 0;
     setTooltip({ visivel: true, x: e.clientX, y: e.clientY - 36, usado, disponivelMin: disponivel, pctReal });
   };
 
   const handleMouseLeave = () => setTooltip(p => ({ ...p, visivel: false }));
 
   const renderGrupo = (
-    items: { id: number; nome: string; totalMinutosUsados: number }[],
+    items: { id: number; nome: string; totalMinutosUsados: number; minutosDisponiveis: number }[],
     pcts: number[],
     cor: 'blue' | 'violet',
     label: string
@@ -103,10 +101,7 @@ export function RecursosCard({ dados, filtros }: Props) {
       </div>
 
       {items.map((item, i) => {
-        const pct = pcts[i];
-        const pctReal = disponivel > 0
-          ? Math.min((item.totalMinutosUsados / disponivel) * 100, 100)
-          : 0;
+        const pct      = pcts[i];
         const barColor = cor === 'blue' ? 'bg-blue-500' : 'bg-violet-500';
 
         return (
@@ -118,7 +113,7 @@ export function RecursosCard({ dados, filtros }: Props) {
               <div
                 className={`h-full rounded-full ${barColor} transition-all duration-700 cursor-default`}
                 style={{ width: `${pct}%` }}
-                onMouseMove={e => handleMouseMove(e, item.totalMinutosUsados, pctReal)}
+                onMouseMove={e => handleMouseMove(e, item.totalMinutosUsados, item.minutosDisponiveis)}
                 onMouseLeave={handleMouseLeave}
               />
             </div>

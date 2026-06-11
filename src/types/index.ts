@@ -186,6 +186,7 @@ export interface EstatisticasRecursoDTO {
   nome: string;
   totalMinutosUsados: number;
   totalReservasFinalizadas: number;
+  minutosDisponiveis: number; // calculado pelo backend: diasUteis * 900min
 }
 
 export interface EstatisticasStatusReservasDTO {
@@ -196,6 +197,14 @@ export interface EstatisticasStatusReservasDTO {
   total: number;
 }
 
+export interface EstatisticasResumoDTO {
+  totalReservas: number;
+  taxaOcupacaoMedia: number;
+  taxaNoShow: number;
+  recursoMaisUsado: string;
+  tipoRecursoMaisUsado: string;
+}
+
 export interface EstatisticasHeatmapDTO {
   diaSemana: number;
   hora: number;
@@ -203,4 +212,22 @@ export interface EstatisticasHeatmapDTO {
   totalSegundaMetade: number;
   valorParaCor: number;
   media: number;
+}
+
+export interface EstatisticasPontoHistoricoDTO {
+  data: string;
+  total: number;
+  mm?: number; // média móvel, calculada no backend
+}
+
+export interface EstatisticasOcupacaoDiaDTO {
+  diaSemana: number;
+  nome: string;
+  taxaOcupacao: number;
+}
+
+export interface EstatisticasHistoricoDTO {
+  pontos: EstatisticasPontoHistoricoDTO[];
+  tendencia: { pct: number; subindo: boolean } | null;
+  mediaPessoasDia: number;
 }
