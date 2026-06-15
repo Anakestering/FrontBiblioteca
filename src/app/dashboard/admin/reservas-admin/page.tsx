@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { aprovacoes as aprovacaoApi, pedidos as pedidosApi } from '@/lib/api';
+import { DateRangePicker } from '@/app/components/ui/DateRangePicker';
 import { PedidoReserva, AprovacaoReserva, StatusReserva, TipoPedido } from '@/types';
 import { statusReservaLabel, statusReservaColor, formatDateTime, maskCpf, maskTel } from '@/lib/utils';
 import { Alert } from '@/app/components/ui/ErrorAlert';
@@ -451,59 +452,52 @@ function ReservasAdminPageContent() {
         </button>
       </div>
 
-      {/* Filtros Modernizados */}
-      <div className="grid grid-cols-1 sm:flex gap-3 flex-wrap items-center">
-        {/* Campo de Busca Global */}
+      {/* Filtros */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {/* Busca — esquerda */}
         <input
           type="text"
-          placeholder="Buscar no período (Nome, e-mail, sala, PC)..."
+          placeholder="Buscar (nome, e-mail, sala, PC)..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="input-field flex-1 sm:max-w-xs"
+          className="input-field sm:max-w-xs"
         />
 
-        {/* Filtro de Status */}
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value as StatusReserva | '')}
-          className="input-field sm:max-w-[200px]"
-        >
-          {statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-
-        {/* Novo Seletor de Período Inteligente */}
-        <select
-          value={periodo}
-          onChange={e => setPeriodo(e.target.value as PeriodoOpcao)}
-          className="input-field sm:max-w-[180px] font-medium"
-        >
-          <option value="HOJE">Hoje</option>
-          <option value="7_DIAS">Últimos 7 dias</option>
-          <option value="MES_ATUAL">Mês Atual</option>
-          <option value="CUSTOMIZADO">Data Específica</option>
-        </select>
-
-        {/* Input de Data condicional (só aparece se escolher "Data Específica") */}
-        {periodo === 'CUSTOMIZADO' && (
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <input
-              type="date"
-              value={dataCustomizada}
-              onChange={e => setDataCustomizada(e.target.value)}
-              className="input-field sm:max-w-[160px]"
-              placeholder="Data início"
+        {/* Filtros — direita */}
+        <div className="flex gap-2 items-center flex-wrap justify-end">
+          {/* Calendário range — só quando CUSTOMIZADO */}
+          {periodo === 'CUSTOMIZADO' && (
+            <DateRangePicker
+              startDate={dataCustomizada ? new Date(dataCustomizada + 'T00:00:00') : null}
+              endDate={dataCustomizadaFim ? new Date(dataCustomizadaFim + 'T00:00:00') : null}
+              onChange={([start, end]) => {
+                if (start) setDataCustomizada(start.toISOString().split('T')[0]);
+                setDataCustomizadaFim(end ? end.toISOString().split('T')[0] : '');
+              }}
             />
-            <span className="text-xs text-[var(--text-muted)] shrink-0">até</span>
-            <input
-              type="date"
-              value={dataCustomizadaFim}
-              onChange={e => setDataCustomizadaFim(e.target.value)}
-              min={dataCustomizada}
-              className="input-field sm:max-w-[160px]"
-              placeholder="Data fim"
-            />
-          </div>
-        )}
+          )}
+
+          {/* Período */}
+          <select
+            value={periodo}
+            onChange={e => setPeriodo(e.target.value as PeriodoOpcao)}
+            className="input-field w-36 shrink-0"
+          >
+            <option value="HOJE">Hoje</option>
+            <option value="7_DIAS">Últimos 7 dias</option>
+            <option value="MES_ATUAL">Mês Atual</option>
+            <option value="CUSTOMIZADO">Personalizado</option>
+          </select>
+
+          {/* Status */}
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as StatusReserva | '')}
+            className="input-field w-44 shrink-0"
+          >
+            {statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Lista */}

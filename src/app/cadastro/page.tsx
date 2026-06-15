@@ -6,10 +6,25 @@ import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/api';
 import { PasswordInput } from '@/app/components/ui/PasswordInput';
 import { maskCpf } from '@/lib/utils';
+import { TipoUsuario, UsuarioOutroInfo } from '@/types';
+
+const TIPO_USUARIO_LABELS: Record<TipoUsuario, string> = {
+  SENAI: 'Senai',
+  SESI: 'Sesi',
+  COLABORADOR: 'Colaborador',
+  RESPONSAVEL: 'Responsável',
+  OUTRO: 'Outro',
+};
 
 export default function CadastroPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ nome: '', cpf: '', email: '', senha: '', confirmarSenha: '' });
+  const [form, setForm] = useState({
+    nome: '', cpf: '', email: '', senha: '', confirmarSenha: '',
+    tipoUsuario: '' as TipoUsuario | '',
+    ondeConheceu: '',
+    trabalha: false,
+    ondeTrabalha: '',
+  });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,16 +37,26 @@ export default function CadastroPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!form.tipoUsuario) { setError('Selecione o tipo de usuário.'); return; }
     if (form.senha.length < 8) { setError('A senha deve ter pelo menos 8 caracteres.'); return; }
     if (form.senha.length > 18) { setError('A senha deve ter no máximo 18 caracteres.'); return; }
     if (form.senha !== form.confirmarSenha) { setError('As senhas não coincidem.'); return; }
     setLoading(true);
     try {
+      const outroInfo: UsuarioOutroInfo | undefined = form.tipoUsuario === 'OUTRO'
+        ? {
+            ondeConheceu: form.ondeConheceu || undefined,
+            trabalha: form.trabalha,
+            ondeTrabalha: form.trabalha ? form.ondeTrabalha || undefined : undefined,
+          }
+        : undefined;
       await auth.cadastrar({
         nome: form.nome,
         cpf: form.cpf.replace(/\D/g, ''),
         email: form.email,
         senha: form.senha,
+        tipoUsuario: form.tipoUsuario as TipoUsuario,
+        outroInfo,
       });
       router.push('/login?cadastro=ok');
     } catch (err: unknown) {
@@ -121,6 +146,60 @@ export default function CadastroPage() {
                 )}
               </div>
             </div>
+
+            <div>
+              <label className="label">Tipo de usuário</label>
+              <select
+                className="input-field"
+                value={form.tipoUsuario}
+                onChange={e => setForm(f => ({ ...f, tipoUsuario: e.target.value as TipoUsuario }))}
+                required
+              >
+                <option value="">Selecione...</option>
+                {(Object.keys(TIPO_USUARIO_LABELS) as TipoUsuario[]).map(tipo => (
+                  <option key={tipo} value={tipo}>{TIPO_USUARIO_LABELS[tipo]}</option>
+                ))}
+              </select>
+            </div>
+
+            {form.tipoUsuario === 'OUTRO' && (
+              <div className="space-y-3 p-4 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                <div>
+                  <label className="label">Onde conheceu a instituição?</label>
+                  <input
+                    name="ondeConheceu"
+                    type="text"
+                    className="input-field"
+                    placeholder="Ex: indicação de amigo"
+                    value={form.ondeConheceu}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="trabalha"
+                    checked={form.trabalha}
+                    onChange={e => setForm(f => ({ ...f, trabalha: e.target.checked, ondeTrabalha: e.target.checked ? f.ondeTrabalha : '' }))}
+                    className="w-4 h-4 rounded border-[var(--border)] accent-blue-700"
+                  />
+                  <label htmlFor="trabalha" className="text-sm text-[var(--text-primary)]">Trabalha?</label>
+                </div>
+                {form.trabalha && (
+                  <div>
+                    <label className="label">Onde trabalha?</label>
+                    <input
+                      name="ondeTrabalha"
+                      type="text"
+                      className="input-field"
+                      placeholder="Nome da empresa"
+                      value={form.ondeTrabalha}
+                      onChange={handleChange}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {error && (
               <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg">

@@ -14,6 +14,8 @@ import {
   EstatisticasHistoricoDTO,
   EstatisticasResumoDTO,
   EstatisticasOcupacaoDiaDTO,
+  TipoUsuario,
+  UsuarioOutroInfo,
 } from '@/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -179,8 +181,10 @@ export const usuarios = {
   listar: () => request<Usuario[]>('/usuarios'),           // só admin deve usar
   buscarMe: () => request<Usuario>('/usuarios/me'),        // novo — perfil do usuário logado
   buscarPorTermo: (termo: string) => request<Usuario[]>(`/usuarios/buscar?termo=${encodeURIComponent(termo)}`),
-  atualizar: (id: number, dto: Partial<{ nome: string; email: string; cpf: string; telefone?: string }>) =>
+  atualizar: (id: number, dto: Partial<{ nome: string; email: string; cpf: string; telefone?: string; outroInfo?: UsuarioOutroInfo }>) =>
     request<Usuario>(`/usuarios/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  atualizarTipo: (id: number, tipoUsuario: TipoUsuario, outroInfo?: UsuarioOutroInfo) =>
+    request<Usuario>(`/usuarios/${id}/tipo`, { method: 'PATCH', body: JSON.stringify({ tipoUsuario, outroInfo }) }),
   deletar: (id: number) => request<void>(`/usuarios/${id}`, { method: 'DELETE' }),
   ativar: (id: number) =>
     request(`/usuarios/${id}/ativar`, { method: 'PUT' }),

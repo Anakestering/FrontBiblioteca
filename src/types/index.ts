@@ -2,6 +2,14 @@
 
 export type NivelAcesso = 'ADMIN' | 'PADRAO';
 
+export type TipoUsuario = 'SENAI' | 'SESI' | 'COLABORADOR' | 'RESPONSAVEL' | 'OUTRO';
+
+export interface UsuarioOutroInfo {
+  ondeConheceu?: string;
+  trabalha: boolean;
+  ondeTrabalha?: string;
+}
+
 export type StatusReserva =
   | 'PENDENTE_APROVACAO'
   | 'APROVADA'
@@ -25,6 +33,8 @@ export interface Usuario {
   ativo: boolean;
   createdAt: string;
   updatedAt: string;
+  tipoUsuario?: TipoUsuario;
+  outroInfo?: UsuarioOutroInfo;
 }
 
 export interface Computador {
@@ -124,6 +134,8 @@ export interface CadastroDTO {
   cpf: string;
   email: string;
   senha: string;
+  tipoUsuario: TipoUsuario;
+  outroInfo?: UsuarioOutroInfo;
 }
 
 export interface ReservaComputadorDTO {
@@ -198,7 +210,8 @@ export interface EstatisticasStatusReservasDTO {
 }
 
 export interface EstatisticasResumoDTO {
-  totalReservas: number;
+  totalPedidos: number;        // pedidos de reserva finalizados (métrica principal)
+  totalReservas: number;       // recursos individuais (salas + PCs) utilizados
   taxaOcupacaoMedia: number;
   taxaNoShow: number;
   recursoMaisUsado: string;
@@ -216,8 +229,9 @@ export interface EstatisticasHeatmapDTO {
 
 export interface EstatisticasPontoHistoricoDTO {
   data: string;
-  total: number;
-  mm?: number; // média móvel, calculada no backend
+  total: number;           // pedidos finalizados (linha do gráfico)
+  mm?: number;             // média móvel, calculada no backend
+  totalReservas?: number;  // recursos individuais utilizados (tooltip)
 }
 
 export interface EstatisticasOcupacaoDiaDTO {

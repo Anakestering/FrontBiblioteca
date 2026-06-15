@@ -33,8 +33,9 @@ interface Props {
 
 interface PontoHistorico {
   data: string;
-  total: number;
+  total: number;           // pedidos finalizados (linha do gráfico)
   mm?: number;
+  totalReservas?: number;  // recursos individuais utilizados (tooltip)
 }
 
 interface PontoAbandono {
@@ -78,7 +79,8 @@ interface TooltipState {
   x: number;
   y: number;
   data: string;
-  total?: number;
+  total?: number;           // pedidos finalizados
+  totalReservas?: number;   // recursos individuais utilizados
   mm?: number;
   abandono?: number;
   abandonoMm?: number;
@@ -123,7 +125,15 @@ function Tooltip({ state, visReservas, visAbandono, visTendencia, visTendenciaAb
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c3aed', flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: '#e5e7eb' }}>
                 <strong style={{ color: '#fff' }}>{state.total}</strong>
-                <span style={{ color: '#9ca3af', marginLeft: 4 }}>reservas</span>
+                <span style={{ color: '#9ca3af', marginLeft: 4 }}>pedidos finalizados</span>
+              </span>
+            </div>
+          )}
+          {visReservas && state.totalReservas !== undefined && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 14 }}>
+              <span style={{ fontSize: 12, color: '#e5e7eb' }}>
+                <strong style={{ color: '#c4b5fd' }}>{state.totalReservas}</strong>
+                <span style={{ color: '#9ca3af', marginLeft: 4 }}>reservas finalizadas</span>
               </span>
             </div>
           )}
@@ -132,7 +142,7 @@ function Tooltip({ state, visReservas, visAbandono, visTendencia, visTendenciaAb
               <span style={{ width: 8, height: 2, borderTop: '2px dashed #a78bfa', flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: '#e5e7eb' }}>
                 <strong style={{ color: '#a78bfa' }}>{state.mm.toFixed(1)}</strong>
-                <span style={{ color: '#9ca3af', marginLeft: 4 }}>média {janela}p</span>
+                <span style={{ color: '#9ca3af', marginLeft: 4 }}>média tendencia </span>
               </span>
             </div>
           )}
@@ -150,7 +160,7 @@ function Tooltip({ state, visReservas, visAbandono, visTendencia, visTendenciaAb
               <span style={{ width: 8, height: 2, borderTop: '2px dashed #fb923c', flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: '#e5e7eb' }}>
                 <strong style={{ color: '#fb923c' }}>{state.abandonoMm.toFixed(1)}</strong>
-                <span style={{ color: '#9ca3af', marginLeft: 4 }}>méd. aband. {janela}p</span>
+                <span style={{ color: '#9ca3af', marginLeft: 4 }}>media abandono {janela}</span>
               </span>
             </div>
           )}
@@ -422,10 +432,11 @@ export function LinearCard({ filtros, globalVersao, onDadosChange }: Props) {
         x: param.point.x,
         y: param.point.y,
         data: pontoRes?.data ?? pontoAb?.data ?? timeStr,
-        total:      mainVal    ? (mainVal    as LineData).value : undefined,
-        mm:         mmVal      ? (mmVal      as LineData).value : undefined,
-        abandono:   abandonoVal ? (abandonoVal as LineData).value : undefined,
-        abandonoMm: abMmVal    ? (abMmVal    as LineData).value : undefined,
+        total:         mainVal    ? (mainVal    as LineData).value : undefined,
+        totalReservas: pontoRes?.totalReservas,
+        mm:            mmVal      ? (mmVal      as LineData).value : undefined,
+        abandono:      abandonoVal ? (abandonoVal as LineData).value : undefined,
+        abandonoMm:    abMmVal    ? (abMmVal    as LineData).value : undefined,
         agrupamento,
       });
     });
@@ -451,7 +462,7 @@ export function LinearCard({ filtros, globalVersao, onDadosChange }: Props) {
             <h2 className="section-title cursor-default">Fluxo de Reservas</h2>
             <div className="absolute top-full left-0 mt-1 hidden group-hover/label:block z-50 pointer-events-none">
               <div className="bg-black border border-gray-700 rounded-lg shadow-xl px-3 py-1.5 text-xs whitespace-nowrap text-gray-300">
-                Total de reservas finalizadas ao longo do tempo
+                Total de pedidos/reservas finalizadas ao longo do tempo
               </div>
             </div>
           </div>
@@ -520,14 +531,14 @@ export function LinearCard({ filtros, globalVersao, onDadosChange }: Props) {
             ativo={visReservas}
             onChange={setVisReservas}
             cor="#7c3aed"
-            label="Reservas"
+            label="Pedidos"
           />
           <ToggleLinha
             ativo={visTendencia}
             onChange={setVisTendencia}
             cor="#a78bfa"
             dashed
-            label={`Tendência ${JANELA_MM[agrupamento]}p`}
+            label={`Tendência pedido`}
           />
           <ToggleLinha
             ativo={visAbandono}

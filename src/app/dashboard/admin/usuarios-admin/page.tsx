@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { usuarios as usuariosApi, auth } from '@/lib/api';
-import { Usuario } from '@/types';
+import { Usuario, TipoUsuario, UsuarioOutroInfo } from '@/types';
 import { formatDate, maskCpf, maskTel } from '@/lib/utils';
 import { Modal } from '@/app/components/ui/Modal';
 import { Alert } from '@/app/components/ui/ErrorAlert';
@@ -14,12 +14,24 @@ import { PageHeader } from '@/app/components/ui/PageHeader';
 import { useConfirm } from '@/app/hooks/useConfirm';
 import { LoadingList } from '@/app/components/ui/LoadingList';
 
+const TIPO_USUARIO_LABELS: Record<TipoUsuario, string> = {
+  SENAI: 'Senai',
+  SESI: 'Sesi',
+  COLABORADOR: 'Colaborador',
+  RESPONSAVEL: 'Responsável',
+  OUTRO: 'Outro',
+};
+
 interface CadastroForm {
   nome: string;
   email: string;
   cpf: string;
   telefone: string;
   senha: string;
+  tipoUsuario: TipoUsuario;
+  ondeConheceu: string;
+  trabalha: boolean;
+  ondeTrabalha: string;
 }
 
 interface Stats {
@@ -28,7 +40,13 @@ interface Stats {
   cadastradosNaSemana: number;
 }
 
-const emptyForm = (): CadastroForm => ({ nome: '', email: '', cpf: '', telefone: '', senha: '' });
+const emptyForm = (): CadastroForm => ({
+  nome: '', email: '', cpf: '', telefone: '', senha: '',
+  tipoUsuario: 'SENAI',
+  ondeConheceu: '',
+  trabalha: false,
+  ondeTrabalha: '',
+});
 
 // ─── MODAL DE DETALHES ────────────────────────────────────────────────────────
 function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
@@ -64,6 +82,29 @@ function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
             <span className="text-[var(--text-muted)]">Status</span>
             <ActiveBadge ativo={usuario.ativo} />
           </div>
+          {usuario.tipoUsuario && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-[var(--text-muted)]">Tipo</span>
+              <span className="text-[var(--text-primary)]">{TIPO_USUARIO_LABELS[usuario.tipoUsuario]}</span>
+            </div>
+          )}
+          {usuario.tipoUsuario === 'OUTRO' && usuario.outroInfo && (
+            <>
+              <div className="border-t border-[var(--border)]" />
+              {usuario.outroInfo.ondeConheceu && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">Onde conheceu</span>
+                  <span className="text-[var(--text-primary)] ml-2 text-right">{usuario.outroInfo.ondeConheceu}</span>
+                </div>
+              )}
+              {usuario.outroInfo.trabalha && usuario.outroInfo.ondeTrabalha && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">Onde trabalha</span>
+                  <span className="text-[var(--text-primary)] ml-2 text-right">{usuario.outroInfo.ondeTrabalha}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {usuario.nivelAcesso !== 'ADMIN' && (
@@ -102,21 +143,36 @@ function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
 }
 
 // ─── MODAL DE EDIÇÃO ──────────────────────────────────────────────────────────
+interface EditarForm {
+  nome: string;
+  email: string;
+  cpf: string;
+  telefone: string;
+  tipoUsuario: TipoUsuario;
+  ondeConheceu: string;
+  trabalha: boolean;
+  ondeTrabalha: string;
+}
+
 function EditarModal({ usuario, onClose, onSucesso }: {
   usuario: Usuario;
   onClose: () => void;
   onSucesso: (usuarioAtualizado: Usuario) => Promise<void>;
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<EditarForm>({
     nome: usuario.nome,
     email: usuario.email,
     cpf: maskCpf(usuario.cpf ?? ''),
     telefone: maskTel(usuario.telefone ?? ''),
+    tipoUsuario: usuario.tipoUsuario ?? 'SENAI',
+    ondeConheceu: usuario.outroInfo?.ondeConheceu ?? '',
+    trabalha: usuario.outroInfo?.trabalha ?? false,
+    ondeTrabalha: usuario.outroInfo?.ondeTrabalha ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const set = (field: keyof typeof form, value: string) =>
+  const set = <K extends keyof EditarForm>(field: K, value: EditarForm[K]) =>
     setForm(f => ({ ...f, [field]: value }));
 
   const handleSalvar = async () => {
@@ -129,11 +185,26 @@ function EditarModal({ usuario, onClose, onSucesso }: {
         cpf: form.cpf.replace(/\D/g, ''),
         telefone: form.telefone ? form.telefone.replace(/\D/g, '') : undefined,
       };
-      
       await usuariosApi.atualizar(usuario.id, payload);
-      
-      // Mescla os dados antigos com os novos para atualizar o modal de detalhes
-      const usuarioAtualizado: Usuario = { ...usuario, ...payload };
+
+      const outroInfo: UsuarioOutroInfo | undefined = form.tipoUsuario === 'OUTRO'
+        ? {
+            ondeConheceu: form.ondeConheceu || undefined,
+            trabalha: form.trabalha,
+            ondeTrabalha: form.trabalha ? form.ondeTrabalha || undefined : undefined,
+          }
+        : undefined;
+
+      if (form.tipoUsuario !== (usuario.tipoUsuario ?? '') || form.tipoUsuario === 'OUTRO') {
+        await usuariosApi.atualizarTipo(usuario.id, form.tipoUsuario, outroInfo);
+      }
+
+      const usuarioAtualizado: Usuario = {
+        ...usuario,
+        ...payload,
+        tipoUsuario: form.tipoUsuario,
+        outroInfo,
+      };
       await onSucesso(usuarioAtualizado);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao salvar');
@@ -166,6 +237,37 @@ function EditarModal({ usuario, onClose, onSucesso }: {
           <input type="email" className="input-field" value={form.email}
             onChange={e => set('email', e.target.value)} />
         </div>
+        <div>
+          <label className="label">Tipo de usuário</label>
+          <select className="input-field" value={form.tipoUsuario}
+            onChange={e => set('tipoUsuario', e.target.value as TipoUsuario)}>
+            {(Object.keys(TIPO_USUARIO_LABELS) as TipoUsuario[]).map(tipo => (
+              <option key={tipo} value={tipo}>{TIPO_USUARIO_LABELS[tipo]}</option>
+            ))}
+          </select>
+        </div>
+        {form.tipoUsuario === 'OUTRO' && (
+          <div className="space-y-3 p-4 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+            <div>
+              <label className="label">Onde conheceu a instituição?</label>
+              <input className="input-field" value={form.ondeConheceu}
+                onChange={e => set('ondeConheceu', e.target.value)} placeholder="Ex: indicação de amigo" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="editar-trabalha" checked={form.trabalha}
+                onChange={e => set('trabalha', e.target.checked)}
+                className="w-4 h-4 rounded border-[var(--border)] accent-blue-700" />
+              <label htmlFor="editar-trabalha" className="text-sm text-[var(--text-primary)]">Trabalha?</label>
+            </div>
+            {form.trabalha && (
+              <div>
+                <label className="label">Onde trabalha?</label>
+                <input className="input-field" value={form.ondeTrabalha}
+                  onChange={e => set('ondeTrabalha', e.target.value)} placeholder="Nome da empresa" />
+              </div>
+            )}
+          </div>
+        )}
         <Alert message={error} />
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
@@ -182,7 +284,7 @@ function CadastroModal({ onClose, onSucesso }: { onClose: () => void; onSucesso:
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const set = (field: keyof CadastroForm, value: string) =>
+  const set = <K extends keyof CadastroForm>(field: K, value: CadastroForm[K]) =>
     setForm(f => ({ ...f, [field]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -190,12 +292,21 @@ function CadastroModal({ onClose, onSucesso }: { onClose: () => void; onSucesso:
     setError('');
     setSaving(true);
     try {
+      const outroInfo: UsuarioOutroInfo | undefined = form.tipoUsuario === 'OUTRO'
+        ? {
+            ondeConheceu: form.ondeConheceu || undefined,
+            trabalha: form.trabalha,
+            ondeTrabalha: form.trabalha ? form.ondeTrabalha || undefined : undefined,
+          }
+        : undefined;
       await auth.cadastrar({
         nome: form.nome,
         email: form.email,
         cpf: form.cpf.replace(/\D/g, ''),
         telefone: form.telefone ? form.telefone.replace(/\D/g, '') : undefined,
         senha: form.senha,
+        tipoUsuario: form.tipoUsuario,
+        outroInfo,
       });
       onSucesso();
       onClose();
@@ -236,6 +347,37 @@ function CadastroModal({ onClose, onSucesso }: { onClose: () => void; onSucesso:
           <input type="password" className="input-field" placeholder="Mínimo 8 caracteres" required
             minLength={8} value={form.senha} onChange={e => set('senha', e.target.value)} />
         </div>
+        <div>
+          <label className="label">Tipo de usuário</label>
+          <select className="input-field" value={form.tipoUsuario} required
+            onChange={e => set('tipoUsuario', e.target.value as TipoUsuario)}>
+            {(Object.keys(TIPO_USUARIO_LABELS) as TipoUsuario[]).map(tipo => (
+              <option key={tipo} value={tipo}>{TIPO_USUARIO_LABELS[tipo]}</option>
+            ))}
+          </select>
+        </div>
+        {form.tipoUsuario === 'OUTRO' && (
+          <div className="space-y-3 p-4 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+            <div>
+              <label className="label">Onde conheceu a instituição?</label>
+              <input className="input-field" value={form.ondeConheceu}
+                onChange={e => set('ondeConheceu', e.target.value)} placeholder="Ex: indicação de amigo" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="cadastro-trabalha" checked={form.trabalha}
+                onChange={e => set('trabalha', e.target.checked)}
+                className="w-4 h-4 rounded border-[var(--border)] accent-blue-700" />
+              <label htmlFor="cadastro-trabalha" className="text-sm text-[var(--text-primary)]">Trabalha?</label>
+            </div>
+            {form.trabalha && (
+              <div>
+                <label className="label">Onde trabalha?</label>
+                <input className="input-field" value={form.ondeTrabalha}
+                  onChange={e => set('ondeTrabalha', e.target.value)} placeholder="Nome da empresa" />
+              </div>
+            )}
+          </div>
+        )}
         <Alert message={error} />
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
@@ -258,6 +400,8 @@ export default function UsuariosAdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState<TipoUsuario | ''>('');
+  const [filtroAtivo, setFiltroAtivo] = useState<'todos' | 'ativos' | 'inativos'>('ativos');
   const [modal, setModal] = useState<ModalState>(null);
   const { openConfirm, confirmModal } = useConfirm();
 
@@ -324,6 +468,10 @@ export default function UsuariosAdminPage() {
     ? `${stats.total} total · ${stats.cadastradosNaSemana} esta semana`
     : '—';
 
+  const listaFiltrada = list
+    .filter(u => !filtroTipo || u.tipoUsuario === filtroTipo)
+    .filter(u => filtroAtivo === 'todos' ? true : filtroAtivo === 'ativos' ? u.ativo : !u.ativo);
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <PageHeader
@@ -333,19 +481,42 @@ export default function UsuariosAdminPage() {
         onButtonClick={() => setModal({ tipo: 'cadastro' })}
       />
 
-      <SearchInput
-        value={search}
-        onChange={setSearch}
-        placeholder="Buscar por nome, email ou CPF..."
-      />
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por nome, email ou CPF..."
+          />
+        </div>
+        <select
+          className="input-field w-32 shrink-0 text-sm"
+          value={filtroTipo}
+          onChange={e => setFiltroTipo(e.target.value as TipoUsuario | '')}
+        >
+          <option value="">Todos</option>
+          {(Object.keys(TIPO_USUARIO_LABELS) as TipoUsuario[]).map(tipo => (
+            <option key={tipo} value={tipo}>{TIPO_USUARIO_LABELS[tipo]}</option>
+          ))}
+        </select>
+        <select
+          className="input-field w-28 shrink-0 text-sm"
+          value={filtroAtivo}
+          onChange={e => setFiltroAtivo(e.target.value as 'todos' | 'ativos' | 'inativos')}
+        >
+          <option value="ativos">Ativos</option>
+          <option value="inativos">Inativos</option>
+          <option value="todos">Todos</option>
+        </select>
+      </div>
 
       {loading ? (
         <LoadingList items={3} />
-      ) : list.length === 0 ? (
+      ) : listaFiltrada.length === 0 ? (
         <EmptyState message={search.trim() ? "Nenhum usuário encontrado" : "Nenhum usuário cadastrado no sistema"} />
       ) : (
         <div className="card divide-y divide-[var(--border)]">
-          {list.map(u => (
+          {listaFiltrada.map(u => (
             <div key={u.id} onClick={() => setModal({ tipo: 'detalhes', usuario: u })}
               className={`flex items-center justify-between px-5 py-4 gap-3 cursor-pointer hover:bg-[var(--surface-2)] transition-colors ${!u.ativo ? 'opacity-50' : ''}`}>
 
@@ -356,6 +527,14 @@ export default function UsuariosAdminPage() {
                     {u.nome}
                   </p>
                 </div>
+                {u.tipoUsuario && (
+                  <div className="shrink-0 w-24 hidden sm:block">
+                    <p className="text-xs text-[var(--text-muted)]">Tipo</p>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      {TIPO_USUARIO_LABELS[u.tipoUsuario]}
+                    </p>
+                  </div>
+                )}
                 <div className="shrink-0 w-32 hidden sm:block">
                   <p className="text-xs text-[var(--text-muted)]">CPF</p>
                   <p className="text-sm font-mono text-[var(--text-secondary)]">
@@ -373,7 +552,7 @@ export default function UsuariosAdminPage() {
             </div>
           ))}
           <div className="px-5 py-2 text-xs text-[var(--text-muted)]">
-            {list.length} resultado{list.length !== 1 ? 's' : ''}
+            {listaFiltrada.length} resultado{listaFiltrada.length !== 1 ? 's' : ''}
           </div>
         </div>
       )}

@@ -4,10 +4,18 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { usuarios as usuariosApi, auth as authApi } from '@/lib/api';
-import { Usuario } from '@/types';
+import { Usuario, TipoUsuario, UsuarioOutroInfo } from '@/types';
 import { PasswordInput } from '@/app/components/ui/PasswordInput';
 import { CodigoInput } from '@/app/components/ui/CodigoInput';
 import { maskCpf, maskTel } from '@/lib/utils';
+
+const TIPO_USUARIO_LABELS: Record<TipoUsuario, string> = {
+  SENAI: 'Senai',
+  SESI: 'Sesi',
+  COLABORADOR: 'Colaborador',
+  RESPONSAVEL: 'Responsável',
+  OUTRO: 'Outro',
+};
 
 export default function PerfilPage() {
   const { user, logout } = useAuth();
@@ -29,13 +37,17 @@ export default function PerfilPage() {
   const [tempoReenvio, setTempoReenvio] = useState(0);
   const [emailCodigoEnviado, setEmailCodigoEnviado] = useState('');
 
+  const [outroInfoForm, setOutroInfoForm] = useState({ ondeConheceu: '', trabalha: false, ondeTrabalha: '' });
+
   // Estados de Carregamento
   const [saving, setSaving] = useState(false);
   const [savingPwd, setSavingPwd] = useState(false);
+  const [savingOutroInfo, setSavingOutroInfo] = useState(false);
 
   // Feedbacks unificados por contexto
   const [feedbackDados, setFeedbackDados] = useState({ erro: '', sucesso: '' });
   const [feedbackSenha, setFeedbackSenha] = useState({ erro: '', sucesso: '' });
+  const [feedbackOutroInfo, setFeedbackOutroInfo] = useState({ erro: '', sucesso: '' });
 
   const senhasNaoCoincidem = senhaForm.confirmar.length > 0 && senhaForm.nova !== senhaForm.confirmar;
   const senhasRecNaoCoincidem = recuperarForm.confirmar.length > 0 && recuperarForm.nova !== recuperarForm.confirmar;
@@ -65,6 +77,11 @@ export default function PerfilPage() {
           cpf: maskCpf(me.cpf ?? ''),
           telefone: maskTel(me.telefone ?? ''),
         });
+        setOutroInfoForm({
+          ondeConheceu: me.outroInfo?.ondeConheceu ?? '',
+          trabalha: me.outroInfo?.trabalha ?? false,
+          ondeTrabalha: me.outroInfo?.ondeTrabalha ?? '',
+        });
       } catch (err) {
         console.error('Erro ao carregar perfil:', err);
         setFeedbackDados({ erro: 'Não foi possível carregar seus dados. Tente recarregar.', sucesso: '' });
@@ -92,6 +109,32 @@ export default function PerfilPage() {
       setFeedbackDados({ erro: e instanceof Error ? e.message : 'Erro ao salvar dados', sucesso: '' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSalvarOutroInfo = async () => {
+    if (!perfil) return;
+    setFeedbackOutroInfo({ erro: '', sucesso: '' });
+    setSavingOutroInfo(true);
+    try {
+      const outroInfo: UsuarioOutroInfo = {
+        ondeConheceu: outroInfoForm.ondeConheceu || undefined,
+        trabalha: outroInfoForm.trabalha,
+        ondeTrabalha: outroInfoForm.trabalha ? outroInfoForm.ondeTrabalha || undefined : undefined,
+      };
+      await usuariosApi.atualizar(perfil.id, {
+        nome: dadosForm.nome,
+        email: dadosForm.email,
+        cpf: dadosForm.cpf.replace(/\D/g, ''),
+        telefone: dadosForm.telefone ? dadosForm.telefone.replace(/\D/g, '') : undefined,
+        outroInfo,
+      });
+      setFeedbackOutroInfo({ erro: '', sucesso: 'Informações salvas com sucesso!' });
+    } catch (e: unknown) {
+      console.error(e);
+      setFeedbackOutroInfo({ erro: e instanceof Error ? e.message : 'Erro ao salvar', sucesso: '' });
+    } finally {
+      setSavingOutroInfo(false);
     }
   };
 
@@ -253,6 +296,63 @@ export default function PerfilPage() {
         <button onClick={handleSalvarDados} disabled={saving} className="btn-primary w-full flex items-center justify-center gap-2">
           {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Salvando...</> : 'Salvar alterações'}
         </button>
+      </div>
+
+      {/* Seção Tipo de Usuário */}
+      <div className="card p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide">Tipo de usuário</h2>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-[var(--text-muted)]">Tipo</span>
+          {perfil?.tipoUsuario ? (
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-secondary)]">
+              {TIPO_USUARIO_LABELS[perfil.tipoUsuario]}
+            </span>
+          ) : (
+            <span className="text-[var(--text-muted)]">—</span>
+          )}
+        </div>
+
+        {perfil?.tipoUsuario === 'OUTRO' && (
+          <div className="space-y-4 pt-1 border-t border-[var(--border)]">
+            <div>
+              <label className="label">Onde conheceu a instituição?</label>
+              <input
+                className="input-field"
+                placeholder="Ex: indicação de amigo"
+                value={outroInfoForm.ondeConheceu}
+                onChange={e => setOutroInfoForm(p => ({ ...p, ondeConheceu: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="perfil-trabalha"
+                checked={outroInfoForm.trabalha}
+                onChange={e => setOutroInfoForm(p => ({ ...p, trabalha: e.target.checked, ondeTrabalha: e.target.checked ? p.ondeTrabalha : '' }))}
+                className="w-4 h-4 rounded border-[var(--border)] accent-blue-700"
+              />
+              <label htmlFor="perfil-trabalha" className="text-sm text-[var(--text-primary)]">Trabalha?</label>
+            </div>
+            {outroInfoForm.trabalha && (
+              <div>
+                <label className="label">Onde trabalha?</label>
+                <input
+                  className="input-field"
+                  placeholder="Nome da empresa"
+                  value={outroInfoForm.ondeTrabalha}
+                  onChange={e => setOutroInfoForm(p => ({ ...p, ondeTrabalha: e.target.value }))}
+                />
+              </div>
+            )}
+
+            {feedbackOutroInfo.sucesso && <div className="px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800"><p className="text-sm text-emerald-600 dark:text-emerald-400">{feedbackOutroInfo.sucesso}</p></div>}
+            {feedbackOutroInfo.erro && <div className="px-3 py-2.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800"><p className="text-sm text-rose-600 dark:text-rose-400">{feedbackOutroInfo.erro}</p></div>}
+
+            <button onClick={handleSalvarOutroInfo} disabled={savingOutroInfo} className="btn-primary w-full flex items-center justify-center gap-2">
+              {savingOutroInfo ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Salvando...</> : 'Salvar informações'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Seção Alterar Senha */}
