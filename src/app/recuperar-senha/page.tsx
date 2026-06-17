@@ -26,6 +26,18 @@ export default function RecuperarSenhaPage() {
     const senhasNaoCoincidem =
         confirmarSenha.length > 0 && novaSenha !== confirmarSenha;
 
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const emailParam = params.get('email');
+        if (emailParam) {
+            setEmail(emailParam);
+            setEmailEnviado(emailParam);
+            setMostrarEtapa2(true);
+            setTempoRestante(900);
+        }
+    }, []);
+
     // Gerenciador do cronômetro de reenvio e expiração
     useEffect(() => {
         if (tempoRestante <= 0 && tempoReenvio <= 0) {
@@ -62,14 +74,14 @@ export default function RecuperarSenhaPage() {
         setMensagem('');
         setErro('');
         const emailTrimmed = email.trim();
-        
+
         if (!emailTrimmed) { setErro('Informe seu e-mail.'); return; }
         if (!validarEmail(emailTrimmed)) { setErro('E-mail inválido.'); return; }
-        
+
         // Transição visual instantânea para a Etapa 2
         setEmailEnviado(emailTrimmed);
         setMostrarEtapa2(true);
-        setTempoReenvio(60); 
+        setTempoReenvio(60);
         setTempoRestante(900); // 15 minutos estimados padrão
 
         setLoading(true); // Bloqueia e-mail e botão por segurança
@@ -93,12 +105,12 @@ export default function RecuperarSenhaPage() {
         setErro('');
         const codigoTrimmed = codigo.trim();
         const emailTrimmed = email.trim();
-        
+
         if (codigoTrimmed.length !== 8) { setErro('Código inválido.'); return; }
         if (novaSenha.length < 8) { setErro('A senha deve ter no mínimo 8 caracteres.'); return; }
         if (novaSenha.length > 18) { setErro('A senha deve ter no máximo 18 caracteres.'); return; }
         if (novaSenha !== confirmarSenha) { setErro('As senhas não coincidem.'); return; }
-        
+
         setLoading(true);
         try {
             await auth.alterarSenha({ email: emailTrimmed, codigo: codigoTrimmed, novaSenha });
@@ -141,7 +153,7 @@ export default function RecuperarSenhaPage() {
                 <div className="card p-8 space-y-5">
                     <div>
                         <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Recuperar senha</h2>
-                        
+
                         {/* CARD VERDE POSICIONADO NO TOPO DINAMICAMENTE */}
                         {mostrarEtapa2 ? (
                             <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 animate-fade-in my-2">

@@ -27,7 +27,6 @@ interface CadastroForm {
   email: string;
   cpf: string;
   telefone: string;
-  senha: string;
   tipoUsuario: TipoUsuario;
   ondeConheceu: string;
   trabalha: boolean;
@@ -41,7 +40,7 @@ interface Stats {
 }
 
 const emptyForm = (): CadastroForm => ({
-  nome: '', email: '', cpf: '', telefone: '', senha: '',
+  nome: '', email: '', cpf: '', telefone: '',
   tipoUsuario: 'SENAI',
   ondeConheceu: '',
   trabalha: false,
@@ -304,7 +303,6 @@ function CadastroModal({ onClose, onSucesso }: { onClose: () => void; onSucesso:
         email: form.email,
         cpf: form.cpf.replace(/\D/g, ''),
         telefone: form.telefone ? form.telefone.replace(/\D/g, '') : undefined,
-        senha: form.senha,
         tipoUsuario: form.tipoUsuario,
         outroInfo,
       });
@@ -342,10 +340,13 @@ function CadastroModal({ onClose, onSucesso }: { onClose: () => void; onSucesso:
           <input type="email" className="input-field" placeholder="email@exemplo.com" required
             value={form.email} onChange={e => set('email', e.target.value)} />
         </div>
-        <div>
-          <label className="label">Senha</label>
-          <input type="password" className="input-field" placeholder="Mínimo 8 caracteres" required
-            minLength={8} value={form.senha} onChange={e => set('senha', e.target.value)} />
+        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+          <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            Um email será enviado para o usuário com as instruções para criar a senha.
+          </p>
         </div>
         <div>
           <label className="label">Tipo de usuário</label>

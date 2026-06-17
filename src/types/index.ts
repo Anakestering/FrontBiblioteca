@@ -37,6 +37,8 @@ export interface Usuario {
   outroInfo?: UsuarioOutroInfo;
 }
 
+
+
 export interface Computador {
   id: number;
   codigo: string;
@@ -133,7 +135,7 @@ export interface CadastroDTO {
   telefone?: string;
   cpf: string;
   email: string;
-  senha: string;
+  senha?: string;
   tipoUsuario: TipoUsuario;
   outroInfo?: UsuarioOutroInfo;
 }

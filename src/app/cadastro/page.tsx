@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/api';
-import { PasswordInput } from '@/app/components/ui/PasswordInput';
 import { maskCpf } from '@/lib/utils';
 import { TipoUsuario, UsuarioOutroInfo } from '@/types';
 
@@ -19,7 +18,7 @@ const TIPO_USUARIO_LABELS: Record<TipoUsuario, string> = {
 export default function CadastroPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    nome: '', cpf: '', email: '', senha: '', confirmarSenha: '',
+    nome: '', cpf: '', email: '',
     tipoUsuario: '' as TipoUsuario | '',
     ondeConheceu: '',
     trabalha: false,
@@ -32,15 +31,10 @@ export default function CadastroPage() {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
   };
 
-  const senhasNaoCoincidem = form.confirmarSenha.length > 0 && form.senha !== form.confirmarSenha;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!form.tipoUsuario) { setError('Selecione o tipo de usuário.'); return; }
-    if (form.senha.length < 8) { setError('A senha deve ter pelo menos 8 caracteres.'); return; }
-    if (form.senha.length > 18) { setError('A senha deve ter no máximo 18 caracteres.'); return; }
-    if (form.senha !== form.confirmarSenha) { setError('As senhas não coincidem.'); return; }
     setLoading(true);
     try {
       const outroInfo: UsuarioOutroInfo | undefined = form.tipoUsuario === 'OUTRO'
@@ -54,7 +48,6 @@ export default function CadastroPage() {
         nome: form.nome,
         cpf: form.cpf.replace(/\D/g, ''),
         email: form.email,
-        senha: form.senha,
         tipoUsuario: form.tipoUsuario as TipoUsuario,
         outroInfo,
       });
@@ -117,35 +110,16 @@ export default function CadastroPage() {
                 value={form.email} onChange={handleChange} required />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Senha</label>
-                <PasswordInput
-                  placeholder="Digite sua senha"
-                  value={form.senha}
-                  onChange={v => setForm(f => ({ ...f, senha: v }))}
-                  disabled={loading}
-                  maxLength={18}
-                  hasError={form.senha.length > 18}
-                />
-                {form.senha.length > 18 && (
-                  <p className="text-xs text-rose-500 mt-1">Máximo 18 caracteres.</p>
-                )}
+            {form.email && (
+              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Após o cadastro, um email será enviado para <span className="font-medium">{form.email}</span> com as instruções para criar sua senha.
+                </p>
               </div>
-              <div>
-                <label className="label">Confirmar senha</label>
-                <PasswordInput
-                  placeholder="Repita a senha"
-                  value={form.confirmarSenha}
-                  onChange={v => setForm(f => ({ ...f, confirmarSenha: v }))}
-                  disabled={loading}
-                  hasError={senhasNaoCoincidem}
-                />
-                {senhasNaoCoincidem && (
-                  <p className="text-xs text-rose-500 mt-1">As senhas devem ser iguais.</p>
-                )}
-              </div>
-            </div>
+            )}
 
             <div>
               <label className="label">Tipo de usuário</label>
@@ -212,7 +186,7 @@ export default function CadastroPage() {
 
             <button
               type="submit"
-              disabled={loading || senhasNaoCoincidem}
+              disabled={loading}
               className="btn-primary w-full mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
