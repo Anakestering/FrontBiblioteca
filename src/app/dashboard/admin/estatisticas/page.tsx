@@ -199,7 +199,7 @@ export default function EstatisticasPage() {
         />
       </div>
       <div style={{ display: aba === 'usuarios' ? undefined : 'none' }}>
-        <AbaUsuarios />
+        <AbaUsuarios filtros={filtros} globalVersao={globalVersao} />
       </div>
       <div style={{ display: aba === 'download' ? undefined : 'none' }}>
         <AbaDownload dados={dadosRecursos} filtros={filtros} />

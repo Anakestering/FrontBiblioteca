@@ -14,6 +14,7 @@ import {
   EstatisticasHistoricoDTO,
   EstatisticasResumoDTO,
   EstatisticasOcupacaoDiaDTO,
+  EstatisticasUsuariosDTO,
   TipoUsuario,
   UsuarioOutroInfo,
 } from '@/types';
@@ -248,5 +249,12 @@ export const relatorios = {
     if (params.inicio) query.set('inicio', params.inicio);
     if (params.fim) query.set('fim', params.fim);
     return request<EstatisticasResumoDTO>(`/estatisticas/resumo?${query}`);
+  },
+
+  usuarios: (params: { inicio?: string; fim?: string }) => {
+    const query = new URLSearchParams();
+    if (params.inicio) query.set('inicio', params.inicio);
+    if (params.fim) query.set('fim', params.fim);
+    return request<EstatisticasUsuariosDTO>(`/estatisticas/usuarios/estatisticas?${query}`);
   },
 };

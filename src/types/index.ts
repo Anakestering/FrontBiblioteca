@@ -247,3 +247,41 @@ export interface EstatisticasHistoricoDTO {
   tendencia: { pct: number; subindo: boolean } | null;
   mediaPessoasDia: number;
 }
+
+// ─── Estatísticas de Usuários ─────────────────────────────────────────────────
+
+export interface DistribuicaoTipoDTO {
+  tipo: string;
+  usuariosFinalizados: number;
+  pedidosFinalizados: number;
+  mediaVisitas: number;
+  usuariosAbandonos: number;
+  totalAbandonos: number;
+  usuariosCancelamentos: number;
+  totalCancelamentos: number;
+}
+
+export interface RankingUsuarioDTO {
+  id: number;
+  nome: string;
+  tipoUsuario: string | null;
+  pedidosFinalizados: number;
+  pedidosCancelados: number;
+  pedidosAbandono: number;
+  taxaAbandono: number;
+}
+
+export interface CrescimentoMesDTO {
+  mes: string;
+  novosCadastros: number;
+  primeiroUso: number;
+}
+
+export interface EstatisticasUsuariosDTO {
+  distribuicao: DistribuicaoTipoDTO[];
+  ranking: RankingUsuarioDTO[];
+  naoCompareceram: RankingUsuarioDTO[];
+  crescimento: CrescimentoMesDTO[];
+  totalAtivos: number;
+  totalCadastrados: number;
+}
