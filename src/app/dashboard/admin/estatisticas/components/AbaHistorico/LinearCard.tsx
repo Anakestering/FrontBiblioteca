@@ -17,6 +17,11 @@ import { FiltrosRelatorio } from '../../page';
 import { FiltroPeriodoInline, PeriodoFiltro } from '../FiltroPeriodoInline';
 import { toISOLocal } from '@/lib/utils';
 import { relatorios } from '@/lib/api';
+import {
+  EstatisticasPontoHistoricoDTO as PontoHistorico,
+  EstatisticasPontoAbandono    as PontoAbandono,
+  EstatisticasTendencia        as TendenciaDTO,
+} from '@/types';
 
 interface Props {
   filtros: FiltrosRelatorio;
@@ -29,24 +34,6 @@ interface Props {
     tendenciaAbandono: TendenciaDTO | null;
     taxaAbandono: number;
   }) => void;
-}
-
-interface PontoHistorico {
-  data: string;
-  total: number;           // pedidos finalizados (linha do gráfico)
-  mm?: number;
-  totalReservas?: number;  // recursos individuais utilizados (tooltip)
-}
-
-interface PontoAbandono {
-  data: string;
-  total: number;
-  mm?: number;
-}
-
-interface TendenciaDTO {
-  pct: number;
-  subindo: boolean;
 }
 
 type Agrupamento = 'dia' | 'semana' | 'mes';
@@ -254,14 +241,8 @@ export function LinearCard({ filtros, globalVersao, onDadosChange }: Props) {
         setTendenciaAbandono(null);
         onDadosChange?.({ pontos: resposta, tendencia: null, mediaPessoasDia: 0, abandonos: [], tendenciaAbandono: null, taxaAbandono: 0 });
       } else {
-        const r = resposta as {
-          pontos: PontoHistorico[];
-          abandonos: PontoAbandono[];
-          tendencia: TendenciaDTO | null;
-          tendenciaAbandono: TendenciaDTO | null;
-          mediaPessoasDia: number;
-          taxaAbandono: number;
-        };
+        // resposta já é EstatisticasHistoricoDTO — sem cast necessário
+        const r = resposta;
         setDados(r.pontos ?? []);
         setAbandonos(r.abandonos ?? []);
         setTendencia(r.tendencia ?? null);

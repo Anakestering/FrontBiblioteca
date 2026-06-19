@@ -1,153 +1,217 @@
 'use client';
 
 import { useState } from 'react';
-import { DadosRecursos, FiltrosRelatorio } from '../../page';
+import { DadosRecursos } from '../../page';
+import { EstatisticasRecursoDTO } from '@/types';
+import { minutosParaHoras } from '@/lib/utils';
 
 interface Props {
   dados: DadosRecursos;
+  diasFuturo: number;
 }
 
 interface TooltipState {
   visivel: boolean;
   x: number;
   y: number;
-  usado: number;
-  disponivelMin: number;
-  pctReal: number;
+  item: EstatisticasRecursoDTO | null;
 }
 
-function minutosParaHoras(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (h === 0) return `${m}min`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}min`;
-}
+/**
+ * Calcula larguras (%) da barra segmentada de um recurso.
+ * - pctUsado:  historico / disponivel
+ * - pctFuturo: futuro reservado / disponivel (limitado ao espaco restante)
+ * Quando nao ha minutosDisponiveis, usa o maior valor como referencia (escala relativa).
+ */
+function calcBarras(
+  items: EstatisticasRecursoDTO[]
+): { pctUsado: number; pctFuturo: number }[] {
+  const temDisponivel = items.some(r => r.minutosDisponiveis > 0);
 
-function calcPcts(valores: number[]): number[] {
-  if (valores.every(v => v === 0)) return valores.map(() => 0);
-
-  const max = Math.max(...valores);
-
-  const logPcts = valores.map(v => {
-    if (v === 0) return 0;
-    return (Math.log(v + 1) / Math.log(max + 1)) * 100;
-  });
-
-  const indices = valores
-    .map((v, i) => ({ v, i }))
-    .sort((a, b) => b.v - a.v)
-    .map(x => x.i);
-
-  const result = [...logPcts];
-  const MIN_DIFF = 6;
-  const MAX_DIFF = 28;
-
-  for (let r = 1; r < indices.length; r++) {
-    const prevIdx = indices[r - 1];
-    const currIdx = indices[r];
-    if (result[currIdx] === 0) continue;
-
-    const diff = result[prevIdx] - result[currIdx];
-    if (diff < MIN_DIFF) {
-      result[currIdx] = Math.max(result[prevIdx] - MIN_DIFF, 4);
-    } else if (diff > MAX_DIFF) {
-      result[currIdx] = result[prevIdx] - MAX_DIFF;
-    }
+  if (temDisponivel) {
+    return items.map(r => {
+      const total = r.minutosDisponiveis;
+      if (total === 0) return { pctUsado: 0, pctFuturo: 0 };
+      const pctUsado  = Math.min(100, (r.totalMinutosUsados          / total) * 100);
+      const pctFuturo = Math.min(100 - pctUsado, (r.minutosReservadosFuturos / total) * 100);
+      return { pctUsado, pctFuturo };
+    });
   }
 
-  return result;
+  // Sem dados de capacidade: escala relativa ao maior valor combinado
+  const maxCombinado = Math.max(
+    1,
+    ...items.map(r => r.totalMinutosUsados + r.minutosReservadosFuturos)
+  );
+  return items.map(r => {
+    const pctUsado  = (r.totalMinutosUsados          / maxCombinado) * 90;
+    const pctFuturo = (r.minutosReservadosFuturos / maxCombinado) * 90;
+    return { pctUsado, pctFuturo };
+  });
 }
 
-export function RecursosCard({ dados }: Props) {
+interface GrupoProps {
+  items: EstatisticasRecursoDTO[];
+  cor: 'blue' | 'violet';
+  label: string;
+  diasFuturo: number;
+  onHover: (e: React.MouseEvent, item: EstatisticasRecursoDTO) => void;
+  onLeave: () => void;
+}
+
+function GrupoRecursos({ items, cor, label, diasFuturo, onHover, onLeave }: GrupoProps) {
+  const corBarra    = cor === 'blue' ? 'bg-blue-500'   : 'bg-violet-500';
+  const corLabel    = cor === 'blue' ? 'text-blue-500' : 'text-violet-500';
+  const sorted      = [...items].sort((a, b) => b.totalMinutosUsados - a.totalMinutosUsados);
+  const barras      = calcBarras(sorted);
+
+  return (
+    <div className="card p-4 w-full self-start">
+      {/* Cabecalho do grupo */}
+      <div className="flex items-center justify-between mb-4">
+        <p className={`text-[10px] font-semibold uppercase tracking-widest ${corLabel}`}>
+          {label}
+        </p>
+        <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+          <span className="flex items-center gap-1">
+            <span className={`inline-block w-2.5 h-1.5 rounded-sm ${corBarra}`} />
+            Historico
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-2.5 h-1.5 rounded-sm bg-amber-400" />
+            Prox. {diasFuturo}d
+          </span>
+        </div>
+      </div>
+
+      {/* Lista de recursos */}
+      <div className="space-y-3">
+        {sorted.map((item, i) => {
+          const { pctUsado, pctFuturo } = barras[i];
+          const ocupacao = item.minutosDisponiveis > 0
+            ? Math.round((item.totalMinutosUsados / item.minutosDisponiveis) * 100)
+            : null;
+
+          return (
+            <div
+              key={item.id}
+              className="group cursor-default"
+              onMouseMove={e => onHover(e, item)}
+              onMouseLeave={onLeave}
+            >
+              {/* Nome + valores */}
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className={`text-xs truncate max-w-[55%] flex items-center gap-1 ${i === 0 && item.totalMinutosUsados > 0 ? 'font-bold text-[var(--text-primary)]' : 'font-medium text-[var(--text-primary)]'}`}>
+                  {i === 0 && item.totalMinutosUsados > 0 && (
+                    <span className={`text-[9px] ${cor === 'blue' ? 'text-blue-400' : 'text-violet-400'}`}>▲</span>
+                  )}
+                  {item.nome}
+                </span>
+                <div className="flex items-center gap-2 text-[10px] shrink-0">
+                  <span className={`font-semibold ${corLabel}`}>
+                    {minutosParaHoras(item.totalMinutosUsados)}
+                  </span>
+                  {item.minutosReservadosFuturos > 0 && (
+                    <span className="text-amber-400 font-semibold">
+                      +{minutosParaHoras(item.minutosReservadosFuturos)}
+                    </span>
+                  )}
+                  {ocupacao !== null && (
+                    <span className="text-[var(--text-muted)]">{ocupacao}%</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Barra segmentada: [historico][futuro][disponivel] */}
+              <div className="h-2 rounded-full bg-[var(--surface-2)] w-full overflow-hidden flex">
+                <div
+                  className={`h-full rounded-l-full transition-all duration-700 ${corBarra}`}
+                  style={{ width: `${pctUsado}%` }}
+                />
+                <div
+                  className="h-full transition-all duration-700 bg-amber-400"
+                  style={{ width: `${pctFuturo}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function RecursosCard({ dados, diasFuturo }: Props) {
+  // Hooks antes de qualquer return condicional (Rules of Hooks)
+  const [tooltip, setTooltip] = useState<TooltipState>({
+    visivel: false, x: 0, y: 0, item: null,
+  });
+
   const temPcs   = dados.computadores.length > 0;
   const temSalas = dados.salas.length > 0;
   if (!temPcs && !temSalas) return null;
 
-  const unico = (temPcs && !temSalas) || (!temPcs && temSalas);
+  const onHover = (e: React.MouseEvent, item: EstatisticasRecursoDTO) =>
+    setTooltip({ visivel: true, x: e.clientX, y: e.clientY - 56, item });
 
-  const pctsPcs   = calcPcts(dados.computadores.map(c => c.totalMinutosUsados));
-  const pctsSalas = calcPcts(dados.salas.map(s => s.totalMinutosUsados));
+  const onLeave = () => setTooltip(p => ({ ...p, visivel: false }));
 
-  const [tooltip, setTooltip] = useState<TooltipState>({
-    visivel: false, x: 0, y: 0, usado: 0, disponivelMin: 0, pctReal: 0,
-  });
-
-  const handleMouseMove = (e: React.MouseEvent, usado: number, disponivel: number) => {
-    const pctReal = disponivel > 0 ? Math.min((usado / disponivel) * 100, 100) : 0;
-    setTooltip({ visivel: true, x: e.clientX, y: e.clientY - 36, usado, disponivelMin: disponivel, pctReal });
-  };
-
-  const handleMouseLeave = () => setTooltip(p => ({ ...p, visivel: false }));
-
-  const renderGrupo = (
-    items: { id: number; nome: string; totalMinutosUsados: number; minutosDisponiveis: number }[],
-    pcts: number[],
-    cor: 'blue' | 'violet',
-    label: string
-  ) => (
-    <div className="card p-4 w-full space-y-1 self-start">
-      <div className="relative group/label inline-block mb-3">
-        <p className={`text-[10px] font-semibold uppercase tracking-widest cursor-default ${
-          cor === 'blue' ? 'text-blue-500' : 'text-violet-500'
-        }`}>
-          {label}
-        </p>
-        <div className="absolute bottom-full left-0 mb-1 hidden group-hover/label:block z-50 pointer-events-none">
-          <div className="bg-black border border-gray-700 rounded-lg shadow-xl px-3 py-1.5 text-xs whitespace-nowrap text-gray-300">
-            {cor === 'blue' ? 'Total de horas usadas por computador no período' : 'Total de horas usadas por sala no período'}
-          </div>
-        </div>
-      </div>
-
-      {items.map((item, i) => {
-        const pct      = pcts[i];
-        const barColor = cor === 'blue' ? 'bg-blue-500' : 'bg-violet-500';
-
-        return (
-          <div key={item.id} className="space-y-0.5">
-            <span className="text-[11px] font-mono text-[var(--text-primary)]">
-              {item.nome}
-            </span>
-            <div className="h-1.5 rounded-full bg-[var(--surface-2)] w-full">
-              <div
-                className={`h-full rounded-full ${barColor} transition-all duration-700 cursor-default`}
-                style={{ width: `${pct}%` }}
-                onMouseMove={e => handleMouseMove(e, item.totalMinutosUsados, item.minutosDisponiveis)}
-                onMouseLeave={handleMouseLeave}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  const tt = tooltip.item;
 
   return (
     <>
-      {tooltip.visivel && (
+      {/* Tooltip flutuante */}
+      {tooltip.visivel && tt && (
         <div
           className="fixed z-50 pointer-events-none"
           style={{ left: tooltip.x, top: tooltip.y, transform: 'translateX(-50%)' }}
         >
-          <div className="bg-black border border-gray-700 rounded-lg shadow-xl px-3 py-1.5 text-xs whitespace-nowrap">
-            <span className="text-white font-semibold">{minutosParaHoras(tooltip.usado)}</span>
-            <span className="text-gray-500"> / {minutosParaHoras(tooltip.disponivelMin)} · </span>
-            <span className="text-gray-300">{Math.round(tooltip.pctReal)}%</span>
+          <div className="bg-[#111] border border-gray-700 rounded-lg shadow-xl px-3 py-2 text-xs whitespace-nowrap space-y-1">
+            <div className="text-gray-300 font-semibold mb-1">{tt.nome}</div>
+            <div>
+              <span className="text-[var(--text-muted)]">Historico: </span>
+              <span className="text-white font-medium">{minutosParaHoras(tt.totalMinutosUsados)}</span>
+              {tt.minutosDisponiveis > 0 && (
+                <span className="text-gray-500">
+                  {' '}/ {minutosParaHoras(tt.minutosDisponiveis)}{' '}
+                  ({Math.round((tt.totalMinutosUsados / tt.minutosDisponiveis) * 100)}%)
+                </span>
+              )}
+            </div>
+            {tt.minutosReservadosFuturos > 0 && (
+              <div>
+                <span className="text-[var(--text-muted)]">Agendado: </span>
+                <span className="text-amber-400 font-medium">+{minutosParaHoras(tt.minutosReservadosFuturos)}</span>
+              </div>
+            )}
+            {tt.totalReservasFinalizadas > 0 && (
+              <div className="text-gray-500">{tt.totalReservasFinalizadas} reservas finalizadas</div>
+            )}
           </div>
         </div>
       )}
 
-      <div className="flex gap-4 items-start flex-1 min-w-0">
-        {temPcs && (
-          <div className={unico ? 'w-1/2' : 'flex-1 min-w-0'}>
-            {renderGrupo(dados.computadores, pctsPcs, 'blue', 'Computadores')}
-          </div>
-        )}
+      {/* Salas e Computadores lado a lado */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {temSalas && (
-          <div className={unico ? 'w-1/2' : 'flex-1 min-w-0'}>
-            {renderGrupo(dados.salas, pctsSalas, 'violet', 'Salas')}
-          </div>
+          <GrupoRecursos
+            items={dados.salas}
+            cor="violet"
+            label="Salas"
+            diasFuturo={diasFuturo}
+            onHover={onHover}
+            onLeave={onLeave}
+          />
+        )}
+        {temPcs && (
+          <GrupoRecursos
+            items={dados.computadores}
+            cor="blue"
+            label="Computadores"
+            diasFuturo={diasFuturo}
+            onHover={onHover}
+            onLeave={onLeave}
+          />
         )}
       </div>
     </>

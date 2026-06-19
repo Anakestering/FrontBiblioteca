@@ -79,7 +79,7 @@ function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-[var(--text-muted)]">Status</span>
-            <ActiveBadge ativo={usuario.ativo} />
+            <ActiveBadge statusConta={usuario.statusConta} />
           </div>
           {usuario.tipoUsuario && (
             <div className="flex items-center justify-between text-sm">
@@ -108,7 +108,7 @@ function DetalhesModal({ usuario, onClose, onEditar, onDesativar, onAtivar }: {
 
         {usuario.nivelAcesso !== 'ADMIN' && (
           <div className="flex gap-2 pt-2">
-            {usuario.ativo ? (
+            {usuario.statusConta !== 'INATIVO' ? (
               <>
                 <button
                   type="button"
@@ -402,7 +402,7 @@ export default function UsuariosAdminPage() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<TipoUsuario | ''>('');
-  const [filtroAtivo, setFiltroAtivo] = useState<'todos' | 'ativos' | 'inativos'>('ativos');
+  const [filtroAtivo, setFiltroAtivo] = useState<'todos' | 'ativos' | 'pendentes' | 'inativos'>('ativos');
   const [modal, setModal] = useState<ModalState>(null);
   const { openConfirm, confirmModal } = useConfirm();
 
@@ -444,7 +444,7 @@ export default function UsuariosAdminPage() {
       confirmLabel: 'Desativar',
       confirmStyle: 'danger',
       onConfirm: async () => {
-        await usuariosApi.deletar(u.id);
+        await usuariosApi.desativar(u.id);
         await fetchUsuarios(search);
         setModal(null);
       },
@@ -471,7 +471,12 @@ export default function UsuariosAdminPage() {
 
   const listaFiltrada = list
     .filter(u => !filtroTipo || u.tipoUsuario === filtroTipo)
-    .filter(u => filtroAtivo === 'todos' ? true : filtroAtivo === 'ativos' ? u.ativo : !u.ativo);
+    .filter(u => {
+    if (filtroAtivo === 'todos')     return true;
+    if (filtroAtivo === 'ativos')    return u.statusConta === 'ATIVO';
+    if (filtroAtivo === 'pendentes') return u.statusConta === 'PENDENTE';
+    return u.statusConta === 'INATIVO';
+  });
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -503,9 +508,10 @@ export default function UsuariosAdminPage() {
         <select
           className="input-field w-28 shrink-0 text-sm"
           value={filtroAtivo}
-          onChange={e => setFiltroAtivo(e.target.value as 'todos' | 'ativos' | 'inativos')}
+          onChange={e => setFiltroAtivo(e.target.value as 'todos' | 'ativos' | 'pendentes' | 'inativos')}
         >
           <option value="ativos">Ativos</option>
+          <option value="pendentes">Pendentes</option>
           <option value="inativos">Inativos</option>
           <option value="todos">Todos</option>
         </select>
@@ -519,7 +525,7 @@ export default function UsuariosAdminPage() {
         <div className="card divide-y divide-[var(--border)]">
           {listaFiltrada.map(u => (
             <div key={u.id} onClick={() => setModal({ tipo: 'detalhes', usuario: u })}
-              className={`flex items-center justify-between px-5 py-4 gap-3 cursor-pointer hover:bg-[var(--surface-2)] transition-colors ${!u.ativo ? 'opacity-50' : ''}`}>
+              className={`flex items-center justify-between px-5 py-4 gap-3 cursor-pointer hover:bg-[var(--surface-2)] transition-colors ${u.statusConta !== 'ATIVO' ? 'opacity-50' : ''}`}>
 
               <div className="flex items-start gap-8 min-w-0 flex-1">
                 <div className="min-w-0 flex-1">
@@ -545,7 +551,7 @@ export default function UsuariosAdminPage() {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
-                <ActiveBadge ativo={u.ativo} />
+                <ActiveBadge statusConta={u.statusConta} />
                 <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>

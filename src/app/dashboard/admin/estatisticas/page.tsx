@@ -3,13 +3,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { registerLocale } from 'react-datepicker';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { AbaHistorico } from './components/AbaHistorico/Page';
-import { AbaRecursos } from './components/AbaRecursos/page';
-import { AbaUsuarios } from './components/AbaUsuarios/page';
-import { AbaDownload } from './components/AbaRelatorio/page';
+import { AbaRecursos } from './components/AbaRecursos/AbaRecursos';
+import { AbaUsuarios } from './components/AbaUsuarios/AbaUsuarios';
+import { AbaDownload } from './components/AbaRelatorio/AbaRelatorio';
 import { FiltroPeriodoInline } from './components/FiltroPeriodoInline';
 import { PeriodoFiltro, toISOLocal } from '@/lib/utils';
 import { relatorios } from '@/lib/api';
-import { EstatisticasRecursoDTO, EstatisticasStatusReservasDTO, EstatisticasHeatmapDTO, EstatisticasResumoDTO } from '@/types';
+import { EstatisticasRecursoDTO, EstatisticasStatusReservasDTO, EstatisticasHeatmapDTO } from '@/types';
 import { salas as salasApi, computadores as computadoresApi } from '@/lib/api';
 import { Sala, Computador } from '@/types';
 
@@ -22,6 +22,7 @@ export interface FiltrosRelatorio {
   fim: Date | null;
   salaIds: number[];
   computadorIds: number[];
+  diasFuturo?: number;
 }
 
 export interface DadosRecursos {
@@ -38,7 +39,6 @@ function getInicioSemana(): Date {
   return seg;
 }
 
-
 export default function EstatisticasPage() {
   const [aba, setAba] = useState<Aba>('historico');
 
@@ -49,7 +49,6 @@ export default function EstatisticasPage() {
     computadorIds: [],
   });
 
-  // Incrementado toda vez que o global é aplicado — cards usam para sincronizar
   const [globalVersao, setGlobalVersao] = useState(0);
 
   const [dadosRecursos, setDadosRecursos] = useState<DadosRecursos>({
@@ -61,9 +60,8 @@ export default function EstatisticasPage() {
   const [heatmapData, setHeatmapData]         = useState<EstatisticasHeatmapDTO[]>([]);
   const [loadingHeatmap, setLoadingHeatmap]   = useState(false);
   const [modoHeatmap, setModoHeatmap]         = useState<'media' | 'total'>('media');
-  const [salasDisponiveis, setSalasDisponiveis]             = useState<Sala[]>([]);
+  const [salasDisponiveis, setSalasDisponiveis]               = useState<Sala[]>([]);
   const [computadoresDisponiveis, setComputadoresDisponiveis] = useState<Computador[]>([]);
-
 
   const buscarHeatmap = useCallback(async (f: FiltrosRelatorio) => {
     setLoadingHeatmap(true);
@@ -90,8 +88,12 @@ export default function EstatisticasPage() {
         fim:    f.fim    ? toISOLocal(f.fim, true) : undefined,
       };
       const [salasData, computadoresData, statusData] = await Promise.all([
-        f.salaIds.length > 0 ? relatorios.salas({ ...params, salaIds: f.salaIds }) : Promise.resolve([]),
-        f.computadorIds.length > 0 ? relatorios.computadores({ ...params, computadorIds: f.computadorIds }) : Promise.resolve([]),
+        f.salaIds.length > 0
+          ? relatorios.salas({ ...params, salaIds: f.salaIds, diasFuturo: f.diasFuturo })
+          : Promise.resolve([]),
+        f.computadorIds.length > 0
+          ? relatorios.computadores({ ...params, computadorIds: f.computadorIds, diasFuturo: f.diasFuturo })
+          : Promise.resolve([]),
         relatorios.status({ ...params, salaIds: f.salaIds, computadorIds: f.computadorIds }),
       ]);
       setDadosRecursos({ salas: salasData, computadores: computadoresData, status: statusData });
@@ -101,7 +103,6 @@ export default function EstatisticasPage() {
     } finally { setLoadingRecursos(false); }
   }, []);
 
-  // Carrega automaticamente na semana atual ao abrir
   useEffect(() => {
     if (jaCarregou) return;
     setJaCarregou(true);
@@ -131,7 +132,6 @@ export default function EstatisticasPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header com abas + filtro global inline */}
       <div className="border-b border-[var(--border)] -mx-4 lg:-mx-8 px-4 lg:px-8">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div className="flex items-end gap-8">
@@ -160,8 +160,6 @@ export default function EstatisticasPage() {
               ))}
             </div>
           </div>
-
-          {/* Filtro global — canto direito do header */}
           <div className="flex items-center gap-2 pb-3">
             <span className="text-xs text-[var(--text-muted)] font-medium">Para todos:</span>
             <FiltroPeriodoInline
@@ -173,7 +171,6 @@ export default function EstatisticasPage() {
           </div>
         </div>
       </div>
-
 
       <div style={{ display: aba === 'historico' ? undefined : 'none' }}>
         <AbaHistorico
@@ -199,7 +196,7 @@ export default function EstatisticasPage() {
         />
       </div>
       <div style={{ display: aba === 'usuarios' ? undefined : 'none' }}>
-        <AbaUsuarios />
+        <AbaUsuarios filtros={filtros} globalVersao={globalVersao} />
       </div>
       <div style={{ display: aba === 'download' ? undefined : 'none' }}>
         <AbaDownload dados={dadosRecursos} filtros={filtros} />

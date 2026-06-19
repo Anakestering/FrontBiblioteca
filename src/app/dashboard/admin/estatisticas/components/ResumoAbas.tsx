@@ -1,12 +1,7 @@
 'use client';
 
-export function formatarNumero(n: number): string {
-  if (n >= 1000) {
-    const k = n / 1000;
-    return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}k`;
-  }
-  return n.toLocaleString('pt-BR');
-}
+// Re-exporta para compatibilidade com imports existentes
+export { formatarNumero } from '@/lib/utils';
 
 export interface CardInfo {
   label: string;

@@ -1,16 +1,4 @@
-'use client';
-
-import { DadosRecursos, FiltrosRelatorio } from "../../page";
-
-interface Props {
-  dados: DadosRecursos;
-  filtros: FiltrosRelatorio;
-}
-
-export function AbaDownload({ dados, filtros }: Props) {
-  return (
-    <div className="card p-6">
-      <p className="text-[var(--text-muted)]">Baixar Relatório — em breve</p>
-    </div>
-  );
-}
+// Stub para satisfazer o App Router do Next.js (que espera default export em page.tsx).
+// O componente real está em ./AbaRelatorio.tsx — importe de lá.
+export { AbaDownload } from './AbaRelatorio';
+export default function Page() { return null; }
