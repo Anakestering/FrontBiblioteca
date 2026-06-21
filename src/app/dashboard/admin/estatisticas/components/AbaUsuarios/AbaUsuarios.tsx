@@ -32,14 +32,14 @@ type MaisMenos = 'mais' | 'menos';
 function toParams(p: PeriodoFiltro) {
   return {
     inicio: p.inicio ? toISOLocal(p.inicio) : undefined,
-    fim:    p.fim    ? toISOLocal(p.fim, true) : undefined,
+    fim: p.fim ? toISOLocal(p.fim, true) : undefined,
   };
 }
 
 // ─── Hook para buscar dados por período ──────────────────────────────────────
 
 function useDadosUsuarios(periodo: PeriodoFiltro) {
-  const [data, setData]       = useState<EstatisticasUsuariosDTO | null>(null);
+  const [data, setData] = useState<EstatisticasUsuariosDTO | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -83,7 +83,7 @@ function MiniBarras({
   }, [distribuicao]);
 
   const total = TIPOS.reduce((s, t) => s + (values[t] ?? 0), 0);
-  const max   = Math.max(1, ...TIPOS.map(t => values[t] ?? 0));
+  const max = Math.max(1, ...TIPOS.map(t => values[t] ?? 0));
 
   const toggle = (tipo: string) =>
     setSelecionados(prev => {
@@ -100,7 +100,7 @@ function MiniBarras({
       {/* Título */}
       <div className="group relative inline-flex items-center gap-1 cursor-default w-fit">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">{titulo}</span>
-        <span className="text-[9px] text-[var(--text-muted)] opacity-40">ⓘ</span>
+
         <div className="absolute bottom-full left-0 mb-1 z-10 hidden group-hover:block bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 whitespace-nowrap shadow-xl pointer-events-none">
           {tooltip}
         </div>
@@ -114,8 +114,8 @@ function MiniBarras({
         <>
           <div className="flex items-end gap-1.5 h-14">
             {TIPOS.map(tipo => {
-              const val  = values[tipo] ?? 0;
-              const pct  = max > 0 ? (val / max) * 100 : 0;
+              const val = values[tipo] ?? 0;
+              const pct = max > 0 ? (val / max) * 100 : 0;
               const ativo = selecionados.size === 0 || selecionados.has(tipo);
               return (
                 <div key={tipo} className="group/bar flex-1 flex flex-col items-center gap-0.5 cursor-pointer relative" onClick={() => toggle(tipo)}>
@@ -131,7 +131,7 @@ function MiniBarras({
                   {val > 0 && (
                     <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 z-10 hidden group-hover/bar:block bg-[#111] border border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-200 whitespace-nowrap shadow-xl pointer-events-none">
                       <span className="font-bold">{val}</span>
-                      <span className="text-gray-400 ml-1">({total > 0 ? Math.round((val / total) * 100) : 0}%)</span>
+                      <span className="text-gray-400 ml-1">({total > 0 ? Math.round((val / total) * 100) : 0}% do total)</span>
                     </div>
                   )}
                 </div>
@@ -150,14 +150,12 @@ function MiniBarras({
                 {infoTipos.map(tipo => {
                   const val = values[tipo] ?? 0;
                   const tot = totalPorTipo[tipo] ?? 0;
-                  const pctTipo = tot > 0 ? Math.round((val / tot) * 100) : 0;
                   return (
                     <div key={tipo} className="flex items-baseline gap-1">
                       <span className={`text-xs font-medium ${TIPO_COR_TEXT[tipo] ?? 'text-gray-400'}`}>
                         {TIPO_LABELS[tipo]}
                       </span>
                       <span className="text-xs font-bold text-[var(--text-primary)]">{val}</span>
-                      <span className="text-[13px] text-[var(--text-muted)]">({pctTipo}%)</span>
                     </div>
                   );
                 })}
@@ -221,16 +219,31 @@ function CardsResumo({ data, loading }: { data: EstatisticasUsuariosDTO | null; 
       .map(t => ({ tipo: t, pct: Math.round(((data.totalPorTipo[t] ?? 0) / total) * 100) }));
   }, [data]);
 
-  // Card 3: % ativação por tipo
-  const tiposAtiv = useMemo(() => {
+  // Card 3: desempenho por tipo (% finalizadas vs total de pedidos do tipo)
+  const tiposDesempenho = useMemo(() => {
     if (!data) return [];
     return TIPOS
-      .filter(t => (data.totalPorTipo[t] ?? 0) > 0)
+      .filter(t => data.distribuicao.some(d => d.tipo === t))
       .map(t => {
-        const total = data.totalPorTipo[t] ?? 0;
-        const ativos = data.ativosPorTipo[t] ?? 0;
-        return { tipo: t, pct: total > 0 ? Math.round((ativos / total) * 100) : 0 };
-      });
+        const d = data.distribuicao.find(x => x.tipo === t);
+        if (!d) return null;
+        const total = d.pedidosFinalizados + d.totalAbandonos + d.totalCancelamentos;
+        const pct = total > 0 ? Math.round((d.pedidosFinalizados / total) * 100) : 0;
+        return { tipo: t, pct, total };
+      })
+      .filter(Boolean) as { tipo: string; pct: number; total: number }[];
+  }, [data]);
+
+  // Card 4: crescimento — sparkline 5 meses + variação
+  const crescimentoData = useMemo(() => {
+    if (!data || data.crescimento.length < 2) return null;
+    const sorted = [...data.crescimento].sort((a, b) => a.mes.localeCompare(b.mes));
+    const ultimos = sorted.slice(-5);
+    const atual = ultimos[ultimos.length - 1].novosCadastros;
+    const anterior = ultimos.length >= 2 ? ultimos[ultimos.length - 2].novosCadastros : 0;
+    const pct = anterior === 0 ? (atual > 0 ? 100 : 0) : Math.round(((atual - anterior) / anterior) * 100);
+    const maxVal = Math.max(1, ...ultimos.map(m => m.novosCadastros));
+    return { ultimos, atual, anterior, pct: Math.abs(pct), subindo: pct >= 0, maxVal };
   }, [data]);
 
   return (
@@ -246,19 +259,18 @@ function CardsResumo({ data, loading }: { data: EstatisticasUsuariosDTO | null; 
             <span className="text-3xl font-bold text-[var(--text-primary)] tabular-nums">{taxaComparec}%</span>
           </div>
         )}
-        <p className="text-[10px] text-[var(--text-muted)]">pedidos finalizados</p>
-        {!loading && totalTodos > 0 && (
-          <div className="h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden mt-0.5">
-            <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${taxaComparec}%` }} />
-          </div>
-        )}
+        <p className="text-[12px] text-[var(--text-muted)]">pedidos finalizados</p>
+
       </div>
 
       {/* Card 2: % tipos cadastrados */}
       <div className="card p-4 flex flex-col gap-1">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400">Tipos de usuários cadastrados</p>
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400">Tipos cadastrados</p>
+          <span className="text-[13px] text-[var(--text-muted)] opacity-60">total cadastrados</span>
+        </div>
         {loading ? (
-          <div className="space-y-1 mt-1">{TIPOS.slice(0,3).map(t => <div key={t} className="h-3.5 w-full rounded shimmer" />)}</div>
+          <div className="space-y-1 mt-1">{TIPOS.slice(0, 3).map(t => <div key={t} className="h-3.5 w-full rounded shimmer" />)}</div>
         ) : (
           <div className="space-y-1 mt-1">
             {tiposPct.map(({ tipo, pct }) => (
@@ -275,30 +287,67 @@ function CardsResumo({ data, loading }: { data: EstatisticasUsuariosDTO | null; 
         )}
       </div>
 
-      {/* Card 3: % ativação por tipo */}
+      {/* Card 3: desempenho por tipo (finalizadas %) */}
       <div className="card p-4 flex flex-col gap-1">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-400">Atividade por tipos de usuários </p>
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-400">Desempenho por tipo</p>
+          <span className="text-[12px] text-[var(--text-muted)] opacity-60">% pedidos finalizados por tipo</span>
+        </div>
         {loading ? (
-          <div className="space-y-1 mt-1">{TIPOS.slice(0,3).map(t => <div key={t} className="h-3.5 w-full rounded shimmer" />)}</div>
+          <div className="space-y-1 mt-1">{TIPOS.slice(0, 3).map(t => <div key={t} className="h-3.5 w-full rounded shimmer" />)}</div>
         ) : (
-          <div className="space-y-1 mt-1">
-            {tiposAtiv.map(({ tipo, pct }) => (
+          <div className="space-y-1.5 mt-1">
+            {tiposDesempenho.map(({ tipo, pct }) => (
               <div key={tipo} className="flex items-center gap-1.5">
                 <span className={`text-xs font-medium w-20 shrink-0 ${TIPO_COR_TEXT[tipo] ?? 'text-gray-400'}`}>{TIPO_LABELS[tipo] ?? tipo}</span>
                 <div className="flex-1 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
-                  <div className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-emerald-300' : 'bg-emerald-200'}`} style={{ width: `${pct}%` }} />
+                  <div
+                    className="h-full rounded-full transition-all bg-emerald-500"
+                    style={{ width: `${pct}%` }}
+                  />
                 </div>
                 <span className="text-xs text-[var(--text-muted)] tabular-nums w-8 text-right">{pct}%</span>
               </div>
             ))}
-            {tiposAtiv.length === 0 && <p className="text-xs text-[var(--text-muted)]">Sem dados</p>}
+            {tiposDesempenho.length === 0 && <p className="text-xs text-[var(--text-muted)]">Sem dados no período</p>}
           </div>
         )}
+
       </div>
 
-      {/* Card 4: pendente */}
-      <div className="card p-4 flex items-center justify-center">
-        <span className="text-xs text-[var(--text-muted)]">Em breve</span>
+      {/* Card 4: crescimento — sparkline 5 meses */}
+      <div className="card p-4 flex flex-col gap-1">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-400">Crescimento</p>
+        {loading ? shimmer : crescimentoData === null ? (
+          <p className="text-xs text-[var(--text-muted)] mt-1">Sem dados suficientes</p>
+        ) : (
+          <>
+            <div className="flex items-end gap-1.5 mt-0.5">
+              <span className={`text-2xl font-bold tabular-nums ${crescimentoData.subindo ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {crescimentoData.subindo ? '▲' : '▼'} {crescimentoData.pct}%
+              </span>
+            </div>
+            {/* Sparkline */}
+            <div className="flex items-end gap-1 h-10 mt-auto">
+              {crescimentoData.ultimos.map((m, i) => {
+                const isLast = i === crescimentoData.ultimos.length - 1;
+                const hPct = crescimentoData.maxVal > 0 ? Math.max((m.novosCadastros / crescimentoData.maxVal) * 100, m.novosCadastros > 0 ? 8 : 0) : 0;
+                const mesAbrev = new Date(m.mes + '-02').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+                return (
+                  <div key={m.mes} className="flex-1 flex flex-col items-center gap-0.5">
+                    <div className="w-full flex flex-col justify-end h-8">
+                      <div
+                        className={`w-full rounded-t transition-all duration-500 ${isLast ? 'bg-violet-500' : 'bg-violet-900/60'}`}
+                        style={{ height: `${hPct}%` }}
+                      />
+                    </div>
+                    <span className="text-[7px] text-[var(--text-muted)] opacity-60">{mesAbrev}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
     </div>
@@ -307,10 +356,12 @@ function CardsResumo({ data, loading }: { data: EstatisticasUsuariosDTO | null; 
 
 // ─── Cards de contagem ────────────────────────────────────────────────────────
 
-function CardsContagem({ data, loading }: { data: EstatisticasUsuariosDTO | null; loading: boolean }) {
+function CardsContagem({ data, loading, filtroGlobal }: { data: EstatisticasUsuariosDTO | null; loading: boolean; filtroGlobal: PeriodoFiltro }) {
   const [tipoTotal, setTipoTotal] = useState('');
   const [tipoNovos, setTipoNovos] = useState('');
-  const [periodoNovos, setPeriodoNovos] = useState<PeriodoFiltro>({ inicio: null, fim: null });
+  const [periodoNovos, setPeriodoNovos] = useState<PeriodoFiltro>(filtroGlobal);
+
+  useEffect(() => { setPeriodoNovos(filtroGlobal); }, [filtroGlobal.inicio?.getTime(), filtroGlobal.fim?.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
   const [novosData, setNovosData] = useState<EstatisticasUsuariosDTO | null>(null);
   const [loadingNovos, setLoadingNovos] = useState(false);
 
@@ -360,15 +411,186 @@ function CardsContagem({ data, loading }: { data: EstatisticasUsuariosDTO | null
         </div>
         {loading || loadingNovos ? <div className="h-8 w-20 rounded shimmer" />
           : (
-          <div>
-            <span className="text-3xl font-bold text-[var(--text-primary)] tabular-nums">{novosVal.toLocaleString()}</span>
-            {totalVal > 0 && (
-              <span className="text-xs text-[var(--text-muted)] ml-2">
-                {Math.round((novosVal / totalVal) * 100)}% do total
-              </span>
-            )}
+            <div>
+              <span className="text-3xl font-bold text-[var(--text-primary)] tabular-nums">{novosVal.toLocaleString()}</span>
+              {totalVal > 0 && (
+                <span className="text-xs text-[var(--text-muted)] ml-2">
+                  {Math.round((novosVal / totalVal) * 100)}% do total
+                </span>
+              )}
+            </div>
+          )}
+      </div>
+    </div>
+  );
+}
+
+
+// ─── Donut SVG com hover ────────────────────────────────────────────────────
+
+const DONUT_SLICES = [
+  { label: 'Finalizadas', color: '#10b981' },
+  { label: 'Canceladas', color: '#f43f5e' },
+  { label: 'Abandonos', color: '#f59e0b' },
+];
+
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function arcPath(cx: number, cy: number, r: number, start: number, end: number) {
+  if (end - start >= 360) end = start + 359.99;
+  const s = polarToCartesian(cx, cy, r, start);
+  const e = polarToCartesian(cx, cy, r, end);
+  const large = end - start > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y} Z`;
+}
+
+function DonutTipo({ fin, can, aba, label, cor }: {
+  fin: number; can: number; aba: number; label: string; cor: string;
+}) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const total = fin + can + aba;
+  const vals = [fin, can, aba];
+  const cx = 40, cy = 40, r = 36, holeR = 20;
+
+  let angle = 0;
+  const arcs = vals.map((v, i) => {
+    const deg = total > 0 ? (v / total) * 360 : 0;
+    const arc = { start: angle, end: angle + deg, color: DONUT_SLICES[i].color, val: v, idx: i };
+    angle += deg;
+    return arc;
+  });
+
+  const hoveredPct = hovered !== null && total > 0
+    ? Math.round((vals[hovered] / total) * 100)
+    : null;
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <span className={`text-sm font-bold ${cor}`}>{label}</span>
+
+      {/* Donut SVG */}
+      <div className="relative">
+        <svg width={120} height={120} viewBox="0 0 80 80" style={{ overflow: 'visible' }}>
+          {/* Track */}
+          <circle cx={cx} cy={cy} r={r} fill="rgba(255,255,255,0.05)" />
+          {total === 0 ? (
+            <circle cx={cx} cy={cy} r={r} fill="rgba(255,255,255,0.06)" />
+          ) : arcs.map(arc => arc.val > 0 && (
+            <path
+              key={arc.idx}
+              d={arcPath(cx, cy, r, arc.start, arc.end)}
+              fill={arc.color}
+              opacity={hovered === null || hovered === arc.idx ? 0.9 : 0.25}
+              style={{ cursor: 'pointer', transition: 'opacity 0.15s' }}
+              onMouseEnter={() => setHovered(arc.idx)}
+              onMouseLeave={() => setHovered(null)}
+            />
+          ))}
+          {/* Buraco central */}
+          <circle cx={cx} cy={cy} r={holeR} fill="var(--surface-1, #0f0f14)" />
+        </svg>
+        {/* % no centro ao hover */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          {hoveredPct !== null && (
+            <span className="text-base font-bold text-[var(--text-primary)]">{hoveredPct}%</span>
+          )}
+        </div>
+      </div>
+
+      {/* Legenda: cor + total + % */}
+      <div className="flex flex-col gap-0.5 w-full">
+        {DONUT_SLICES.map((s, i) => (
+          <div key={i}
+            className="flex items-center gap-1.5 px-1 rounded transition-colors"
+            style={{ background: hovered === i ? `${s.color}18` : 'transparent' }}
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+          >
+            <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
+            <span className="text-xs tabular-nums text-[var(--text-muted)]">{vals[i]}</span>
+            <span className="text-xs tabular-nums ml-auto" style={{ color: s.color }}>
+              {total > 0 ? Math.round((vals[i] / total) * 100) : 0}%
+            </span>
+          </div>
+        ))}
+      </div>
+      <span className="text-xs text-[var(--text-muted)] opacity-50">{total} pedidos</span>
+    </div>
+  );
+}
+
+
+// ─── Seção de donuts por tipo ─────────────────────────────────────────────────
+
+function SecaoDonuts({ filtroGlobal }: { filtroGlobal: PeriodoFiltro }) {
+  const [periodo, setPeriodo] = useState<PeriodoFiltro>(filtroGlobal);
+  const [tipo, setTipo] = useState('');
+
+  useEffect(() => { setPeriodo(filtroGlobal); }, [filtroGlobal.inicio?.getTime(), filtroGlobal.fim?.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { data, loading } = useDadosUsuarios(periodo);
+
+  const distribuicaoFiltrada = useMemo(() => {
+    if (!data) return [];
+    const lista = data.distribuicao.filter(d =>
+      d.pedidosFinalizados + d.totalAbandonos + d.totalCancelamentos > 0
+    );
+    return tipo ? lista.filter(d => d.tipo === tipo) : lista;
+  }, [data, tipo]);
+
+  return (
+    <div className="space-y-3">
+      {/* Filtros */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest">Composição por tipo</h3>
+        <div className="flex items-center gap-2">
+          <select className="input-field text-xs h-7 py-0 px-2 w-auto" value={tipo} onChange={e => setTipo(e.target.value)}>
+            <option value="">Todos tipos</option>
+            {TIPOS.map(t => <option key={t} value={t}>{TIPO_LABELS[t]}</option>)}
+          </select>
+          <FiltroPeriodoInline valor={periodo} loading={loading} onChange={setPeriodo} />
+        </div>
+      </div>
+
+      <div className="card p-4">
+        {loading ? (
+          <div className="flex gap-6 justify-around">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="flex flex-col items-center gap-2">
+                <div className="w-[72px] h-[72px] rounded-full shimmer" />
+                <div className="h-2.5 w-14 rounded shimmer" />
+              </div>
+            ))}
+          </div>
+        ) : distribuicaoFiltrada.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)] text-center py-4">Sem dados no período</p>
+        ) : (
+          <div className="flex flex-wrap gap-6 justify-around">
+            {TIPOS
+              .map(t => distribuicaoFiltrada.find(d => d.tipo === t))
+              .filter(Boolean)
+              .map(d => d && (
+                <DonutTipo
+                  key={d.tipo}
+                  fin={d.pedidosFinalizados}
+                  can={d.totalCancelamentos}
+                  aba={d.totalAbandonos}
+                  label={TIPO_LABELS[d.tipo] ?? d.tipo}
+                  cor={TIPO_COR_TEXT[d.tipo] ?? 'text-gray-400'}
+                />
+              ))
+            }
           </div>
         )}
+        {/* Legenda global */}
+        <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-[var(--border)]">
+          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span className="text-[12px] text-[var(--text-muted)]">Finalizadas</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-rose-500" /><span className="text-[12px] text-[var(--text-muted)]">Canceladas</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-amber-500" /><span className="text-[12px] text-[var(--text-muted)]">Abandonos</span></div>
+        </div>
       </div>
     </div>
   );
@@ -392,9 +614,9 @@ function UserCard({ user }: { user: RankingUsuarioDTO }) {
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <div className="text-center"><p className="text-[9px] text-[var(--text-muted)]">Concluídas</p><p className="text-sm font-bold text-emerald-500">{user.pedidosFinalizados}</p></div>
-          <div className="text-center"><p className="text-[9px] text-[var(--text-muted)]">Canceladas</p><p className="text-sm font-bold text-rose-400">{user.pedidosCancelados}</p></div>
-          <div className="text-center"><p className="text-[9px] text-[var(--text-muted)]">Abandono</p><p className="text-sm font-bold text-amber-400">{user.pedidosAbandono}</p></div>
+          <div className="text-center"><p className="text-[11px] text-[var(--text-muted)]">Concluídas</p><p className="text-sm font-bold text-emerald-500">{user.pedidosFinalizados}</p></div>
+          <div className="text-center"><p className="text-[11px] text-[var(--text-muted)]">Canceladas</p><p className="text-sm font-bold text-rose-400">{user.pedidosCancelados}</p></div>
+          <div className="text-center"><p className="text-[11px] text-[var(--text-muted)]">Abandono</p><p className="text-sm font-bold text-amber-400">{user.pedidosAbandono}</p></div>
           <svg className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform shrink-0 ${aberto ? 'rotate-90' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -446,11 +668,11 @@ function UserCard({ user }: { user: RankingUsuarioDTO }) {
 
 function SecaoLista({ filtroGlobal }: { filtroGlobal: PeriodoFiltro }) {
   const [periodo, setPeriodo] = useState<PeriodoFiltro>(filtroGlobal);
-  const [maisMenos, setMaisMenos]     = useState<MaisMenos>('mais');
-  const [tipo, setTipo]               = useState('');
-  const [statusFiltro, setStatus]     = useState<StatusFiltro>('finalizadas');
-  const [busca, setBusca]             = useState('');
-  const [visivel, setVisivel]         = useState(10);
+  const [maisMenos, setMaisMenos] = useState<MaisMenos>('mais');
+  const [tipo, setTipo] = useState('');
+  const [statusFiltro, setStatus] = useState<StatusFiltro>('finalizadas');
+  const [busca, setBusca] = useState('');
+  const [visivel, setVisivel] = useState(10);
 
   useEffect(() => { setPeriodo(filtroGlobal); }, [filtroGlobal.inicio?.getTime(), filtroGlobal.fim?.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -458,15 +680,19 @@ function SecaoLista({ filtroGlobal }: { filtroGlobal: PeriodoFiltro }) {
 
   const porStatus = useCallback((u: RankingUsuarioDTO) =>
     statusFiltro === 'finalizadas' ? u.pedidosFinalizados
-    : statusFiltro === 'canceladas' ? u.pedidosCancelados
-    : u.pedidosAbandono, [statusFiltro]);
+      : statusFiltro === 'canceladas' ? u.pedidosCancelados
+        : u.pedidosAbandono, [statusFiltro]);
 
   const listaFiltrada = useMemo(() => {
     if (!data) return [];
     return [...data.ranking, ...data.naoCompareceram]
       .filter(u => !tipo || u.tipoUsuario === tipo)
       .filter(u => !busca || u.nome.toLowerCase().includes(busca.toLowerCase()))
-      .sort((a, b) => maisMenos === 'mais' ? porStatus(b) - porStatus(a) : porStatus(a) - porStatus(b));
+      .sort((a, b) => {
+        const diff = maisMenos === 'mais' ? porStatus(b) - porStatus(a) : porStatus(a) - porStatus(b);
+        if (diff !== 0) return diff;
+        return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
+      });
   }, [data, tipo, statusFiltro, maisMenos, busca, porStatus]);
 
   const listaVisivel = listaFiltrada.slice(0, visivel);
@@ -477,20 +703,30 @@ function SecaoLista({ filtroGlobal }: { filtroGlobal: PeriodoFiltro }) {
       <div className="max-w-xl mx-auto space-y-2">
         {/* Filtros */}
         <div className="flex flex-wrap gap-2 items-center">
-          <FiltroPeriodoInline valor={periodo} onChange={setPeriodo} />
-          <select className="input-field text-xs h-7 py-0 px-2 w-auto" value={maisMenos} onChange={e => setMaisMenos(e.target.value as MaisMenos)}>
-            <option value="mais">Mais</option>
-            <option value="menos">Menos</option>
-          </select>
-          <select className="input-field text-xs h-7 py-0 px-2 w-auto" value={statusFiltro} onChange={e => setStatus(e.target.value as StatusFiltro)}>
+          {/* Mais / Menos — botões lado a lado */}
+          <div className="flex rounded-md overflow-hidden border border-[rgba(255,255,255,0.08)]">
+            {(['mais', 'menos'] as MaisMenos[]).map(op => (
+              <button
+                key={op}
+                onClick={() => setMaisMenos(op)}
+                className={`text-xs px-3 h-7 font-medium capitalize transition-all ${maisMenos === op
+                  ? 'bg-[rgba(255,255,255,0.1)] text-[var(--text-primary)]'
+                  : 'bg-transparent text-[var(--text-muted)] opacity-40 hover:opacity-70'}`}
+              >
+                {op === 'mais' ? '▲' : '▼'} {op.charAt(0).toUpperCase() + op.slice(1)}
+              </button>
+            ))}
+          </div>
+          <select className="input-field text-xm h-7 py-0 px-2 w-auto" value={statusFiltro} onChange={e => setStatus(e.target.value as StatusFiltro)}>
             <option value="finalizadas">Finalizadas</option>
             <option value="canceladas">Canceladas</option>
             <option value="abandonos">Abandonos</option>
           </select>
-          <select className="input-field text-xs h-7 py-0 px-2 w-auto" value={tipo} onChange={e => setTipo(e.target.value)}>
+          <select className="input-field text-xm h-7 py-0 px-2 w-auto" value={tipo} onChange={e => setTipo(e.target.value)}>
             <option value="">Todos tipos</option>
             {TIPOS.map(t => <option key={t} value={t}>{TIPO_LABELS[t]}</option>)}
           </select>
+          <FiltroPeriodoInline valor={periodo} onChange={setPeriodo} />
         </div>
         {/* Busca */}
         <input
@@ -506,7 +742,7 @@ function SecaoLista({ filtroGlobal }: { filtroGlobal: PeriodoFiltro }) {
       <div className="max-w-xl mx-auto">
         {loading ? (
           <div className="card divide-y divide-[var(--border)] overflow-hidden">
-            {[1,2,3,4,5].map(i => (
+            {[1, 2, 3, 4, 5].map(i => (
               <div key={i} className="px-4 py-3 flex items-center gap-3">
                 <div className="w-1 h-8 rounded-full bg-[var(--surface-2)] shimmer shrink-0" />
                 <div className="flex-1 space-y-1.5">
@@ -514,7 +750,7 @@ function SecaoLista({ filtroGlobal }: { filtroGlobal: PeriodoFiltro }) {
                   <div className="h-2.5 w-20 rounded shimmer" />
                 </div>
                 <div className="flex gap-3">
-                  {[1,2,3].map(j => <div key={j} className="h-8 w-12 rounded shimmer" />)}
+                  {[1, 2, 3].map(j => <div key={j} className="h-8 w-12 rounded shimmer" />)}
                 </div>
               </div>
             ))}
@@ -564,10 +800,13 @@ export function AbaUsuarios({ filtros, globalVersao }: Props) {
       <CardsResumo data={dataCards} loading={loadingCards} />
 
       {/* Contagem */}
-      <CardsContagem data={dataCards} loading={loadingCards} />
+      <CardsContagem data={dataCards} loading={loadingCards} filtroGlobal={filtroGlobal} />
 
       {/* 3 blocos com filtro próprio */}
       <SecaoBlocos filtroGlobal={filtroGlobal} />
+
+      {/* Donuts por tipo */}
+      <SecaoDonuts filtroGlobal={filtroGlobal} />
 
       {/* Lista com filtro próprio */}
       <SecaoLista filtroGlobal={filtroGlobal} />

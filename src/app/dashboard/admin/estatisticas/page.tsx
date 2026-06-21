@@ -59,7 +59,7 @@ export default function EstatisticasPage() {
   const [jaCarregou, setJaCarregou]           = useState(false);
   const [heatmapData, setHeatmapData]         = useState<EstatisticasHeatmapDTO[]>([]);
   const [loadingHeatmap, setLoadingHeatmap]   = useState(false);
-  const [modoHeatmap, setModoHeatmap]         = useState<'media' | 'total'>('media');
+  const [modoHeatmap, setModoHeatmap]         = useState<'media' | 'total'>('total');
   const [salasDisponiveis, setSalasDisponiveis]               = useState<Sala[]>([]);
   const [computadoresDisponiveis, setComputadoresDisponiveis] = useState<Computador[]>([]);
 

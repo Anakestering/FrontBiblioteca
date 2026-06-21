@@ -114,7 +114,7 @@ function DetalheModal({ pedido, aprovacoes, onClose, onRefresh }: {
     }
   };
 
-  const modalTitle = `${isPC ? '💻 PC' : '🏫 SALA'} — Pedido #${pedido.id}`;
+  const modalTitle = `${isPC ? 'PC' : 'SALA'} — Pedido #${pedido.id}`;
 
   return (
     <Modal title={modalTitle} onClose={onClose} maxWidth="lg">

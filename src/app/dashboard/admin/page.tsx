@@ -49,7 +49,12 @@ type FiltroTipo = 'todos' | 'COMPUTADOR' | 'SALA';
 
 export default function AdminDashboard() {
   const [weekOffset, setWeekOffset] = useState(0);
-  const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date>(() => {
+    const hoje = new Date();
+    const dow = hoje.getDay();
+    if (dow === 0 || dow === 6) return getWeekDays(0)[0]; // segunda se for fim de semana
+    return hoje;
+  });
 
   // Dados fixos e em tempo real do dia de HOJE para os cards do topo
   const [pedidosHoje, setPedidosHoje] = useState<PedidoReserva[]>([]);
@@ -65,10 +70,12 @@ export default function AdminDashboard() {
   const [loadingCalendario, setLoadingCalendario] = useState(false);
   const [filtroSemana, setFiltroSemana] = useState<FiltroTipo>('todos');
   const [selectedPedido, setSelectedPedido] = useState<PedidoReserva | null>(null);
+  const [expandEmUso, setExpandEmUso] = useState<'pc' | 'sala' | null>(null);
 
   const today = new Date();
   const router = useRouter();
   const weekDays = getWeekDays(weekOffset);
+  const weekDaysDisplay = weekDays.slice(0, 5); // Seg–Sex apenas
   const selectedPedidoRef = useRef(selectedPedido);
   selectedPedidoRef.current = selectedPedido;
 
@@ -170,7 +177,18 @@ export default function AdminDashboard() {
 
   // Altera o dia selecionado por padrão ao paginar a semana
   useEffect(() => {
-    setSelectedDay(getWeekDays(weekOffset)[0]);
+    if (weekOffset === 0) {
+      // Semana atual: seleciona hoje (se for fim de semana, vai pra segunda)
+      const hoje = new Date();
+      const dow = hoje.getDay(); // 0=Dom, 6=Sab
+      if (dow === 0 || dow === 6) {
+        setSelectedDay(getWeekDays(0)[0]); // segunda desta semana
+      } else {
+        setSelectedDay(hoje);
+      }
+    } else {
+      setSelectedDay(getWeekDays(weekOffset)[0]); // segunda da semana alvo
+    }
   }, [weekOffset]);
 
   // Mantém o modal sincronizado caso os dados em cache mudem em background
@@ -205,6 +223,18 @@ export default function AdminDashboard() {
   const totalPcsAtivos = allPcs.filter(p => p.ativo).length;
   const totalSalasAtivas = allSalas.filter(s => s.ativo).length;
 
+  const pcsEmUso = pedidosHoje
+    .filter(p => p.tipo === 'COMPUTADOR')
+    .flatMap(p => p.reservasComputador ?? [])
+    .filter(r => r.status === 'EM_ANDAMENTO')
+    .map(r => r.computador?.codigo ?? '—');
+
+  const salasEmUso = pedidosHoje
+    .filter(p => p.tipo === 'SALA')
+    .flatMap(p => p.reservasSala ?? [])
+    .filter(r => r.status === 'EM_ANDAMENTO')
+    .map(r => r.sala?.nome ?? '—');
+
   // Filtra as linhas do dia selecionado consumindo a lista armazenada no cache
   const pedidosDiaFiltrados = useMemo(() => {
     return pedidosSemanaAtual
@@ -223,8 +253,16 @@ export default function AdminDashboard() {
           <h1 className="page-title">Painel Administrativo</h1>
           <p className="text-sm text-[var(--text-muted)] mt-1">Visão geral do sistema</p>
         </div>
-        <button
-          onClick={() => router.push('/dashboard/admin/aprovacoes')}
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/usuario/reservar"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-[var(--surface-2)] hover:bg-[var(--border)] text-[var(--text-secondary)]">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Nova Reserva
+          </Link>
+          <button
+            onClick={() => router.push('/dashboard/admin/aprovacoes')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${pendentes.length > 0
             ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/30'
             : 'bg-[var(--surface-2)] hover:bg-[var(--border)] text-[var(--text-secondary)]'
@@ -239,7 +277,8 @@ export default function AdminDashboard() {
               {pendentes.length}
             </span>
           )}
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* Cards de hoje - Fixos */}
@@ -279,10 +318,16 @@ export default function AdminDashboard() {
       <div>
         <h2 className="section-title mb-3">Em uso agora</h2>
         <div className="grid grid-cols-2 gap-4">
-          <div className="card p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-sm font-medium text-[var(--text-secondary)]">Computadores em uso</span>
+          {/* PCs em uso */}
+          <div className="card p-5 cursor-pointer select-none" onClick={() => setExpandEmUso(expandEmUso === 'pc' ? null : 'pc')}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-sm font-medium text-[var(--text-secondary)]">Computadores em uso</span>
+              </div>
+              <svg className={`w-4 h-4 text-[var(--text-muted)] transition-transform ${expandEmUso === 'pc' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </div>
             <div className="flex items-end gap-2">
               <span className="text-4xl font-bold text-[var(--text-primary)]">{loadingGlobal ? '—' : emUsoPC}</span>
@@ -294,11 +339,30 @@ export default function AdminDashboard() {
                   style={{ width: `${(emUsoPC / totalPcsAtivos) * 100}%` }} />
               </div>
             )}
+            {expandEmUso === 'pc' && !loadingGlobal && (
+              <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-1">
+                {pcsEmUso.length === 0
+                  ? <p className="text-xs text-[var(--text-muted)]">Nenhum computador em uso</p>
+                  : pcsEmUso.map((cod, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      {cod}
+                    </div>
+                  ))
+                }
+              </div>
+            )}
           </div>
-          <div className="card p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-sm font-medium text-[var(--text-secondary)]">Salas em uso</span>
+          {/* Salas em uso */}
+          <div className="card p-5 cursor-pointer select-none" onClick={() => setExpandEmUso(expandEmUso === 'sala' ? null : 'sala')}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-sm font-medium text-[var(--text-secondary)]">Salas em uso</span>
+              </div>
+              <svg className={`w-4 h-4 text-[var(--text-muted)] transition-transform ${expandEmUso === 'sala' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </div>
             <div className="flex items-end gap-2">
               <span className="text-4xl font-bold text-[var(--text-primary)]">{loadingGlobal ? '—' : emUsoSala}</span>
@@ -308,6 +372,19 @@ export default function AdminDashboard() {
               <div className="mt-3 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden">
                 <div className="h-full rounded-full bg-emerald-500 transition-all duration-700"
                   style={{ width: `${(emUsoSala / totalSalasAtivas) * 100}%` }} />
+              </div>
+            )}
+            {expandEmUso === 'sala' && !loadingGlobal && (
+              <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-1">
+                {salasEmUso.length === 0
+                  ? <p className="text-xs text-[var(--text-muted)]">Nenhuma sala em uso</p>
+                  : salasEmUso.map((nome, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      {nome}
+                    </div>
+                  ))
+                }
               </div>
             )}
           </div>
@@ -327,7 +404,7 @@ export default function AdminDashboard() {
             </button>
             <button onClick={() => setWeekOffset(0)}
               className="text-xs font-medium text-blue-600 hover:underline underline-offset-2">
-              {weekOffset === 0 ? 'Semana atual' : 'Voltar para hoje'}
+              {weekOffset === 0 ? 'Semana atual' : weekDays[0].toLocaleDateString('pt-BR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase())}
             </button>
             <button onClick={() => setWeekOffset(w => w + 1)}
               className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
@@ -337,8 +414,8 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          <div className="grid grid-cols-7 border-b border-[var(--border)]">
-            {weekDays.map((day, i) => {
+          <div className="grid grid-cols-5 border-b border-[var(--border)]">
+            {weekDaysDisplay.map((day, i) => {
               const isToday = isSameDay(day, today);
               const isSelected = isSameDay(day, selectedDay);
 
@@ -437,33 +514,6 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Links de gerenciamento */}
-      <div className="grid sm:grid-cols-3 gap-4">
-        <Link href="/dashboard/admin/gerenciar-salas"
-          className="card p-4 flex flex-col items-center justify-center text-center border-2 border-violet-200 dark:border-violet-800 hover:border-violet-400 hover:shadow-md transition-all">
-          <p className="font-semibold text-[var(--text-primary)]">Gerenciar Salas</p>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            {allSalas.length} sala{allSalas.length !== 1 ? 's' : ''} cadastrada{allSalas.length !== 1 ? 's' : ''}
-          </p>
-        </Link>
-
-        <Link href="/dashboard/admin/gerenciar-pcs"
-          className="card p-4 flex flex-col items-center justify-center text-center border-2 border-blue-200 dark:border-blue-800 hover:border-blue-400 hover:shadow-md transition-all">
-          <p className="font-semibold text-[var(--text-primary)]">Gerenciar PCs</p>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            {allPcs.length} computador{allPcs.length !== 1 ? 'es' : ''} cadastrado{allPcs.length !== 1 ? 's' : ''}
-          </p>
-        </Link>
-
-        <Link href="/dashboard/admin/usuarios-admin"
-          className="card p-4 flex flex-col items-center justify-center text-center border-2 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 hover:shadow-md transition-all">
-          <p className="font-semibold text-[var(--text-primary)]">Gerenciar Usuários</p>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            {usersCount} usuário{usersCount !== 1 ? 's' : ''} cadastrado{usersCount !== 1 ? 's' : ''}
-          </p>
-        </Link>
       </div>
 
       {selectedPedido && (
