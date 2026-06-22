@@ -6,6 +6,8 @@ import { VisualizacaoAtual } from './subabas/VisualizacaoAtual';
 import { Selecao }           from './subabas/Selecao';
 import { Editor }            from './subabas/Editor';
 import type { DadosRecursos, FiltrosRelatorio } from '../../page';
+import type { Sala, Computador } from '@/types';
+import type { ExportSnapshot } from './utils/types';
 
 type SubAba = 'geral' | 'atual' | 'selecao' | 'editor';
 
@@ -17,18 +19,21 @@ interface SubAbaMeta {
 }
 
 const SUB_ABAS: SubAbaMeta[] = [
-  { key: 'geral',    label: 'Relatorio Geral',      descricao: 'Resumo automatico com as principais metricas. Escolha o periodo e baixe.' },
-  { key: 'atual',   label: 'O que estou vendo',   descricao: 'Exporta o que esta carregado nas abas com os filtros ja aplicados.',       badge: 'Em breve' },
-  { key: 'selecao', label: 'Selecao',              descricao: 'Escolha quais secoes incluir e configure os filtros de cada uma.',         badge: 'Em breve' },
-  { key: 'editor',  label: 'Editor',               descricao: 'Monte o relatorio do zero arrastando e reordenando os blocos.',            badge: 'Em breve' },
+  { key: 'geral',    label: 'Relatório Geral',    descricao: 'Resumo automático com as principais métricas. Escolha o período e baixe.' },
+  { key: 'atual',   label: 'O que estou vendo',  descricao: 'Exporta o que está carregado nas abas com os filtros já aplicados.' },
+  { key: 'selecao', label: 'Seleção',             descricao: 'Escolha quais seções e componentes incluir na exportação.' },
+  { key: 'editor',  label: 'Editor',              descricao: 'Monte o relatório do zero arrastando e reordenando os blocos.', badge: 'Em breve' },
 ];
 
 interface Props {
   dados: DadosRecursos;
   filtros: FiltrosRelatorio;
+  exportSnapshot: ExportSnapshot | null;
+  salasDisponiveis: Sala[];
+  computadoresDisponiveis: Computador[];
 }
 
-export function AbaDownload({ dados, filtros }: Props) {
+export function AbaDownload({ dados, filtros, exportSnapshot, salasDisponiveis, computadoresDisponiveis }: Props) {
   const [subAba, setSubAba] = useState<SubAba>('geral');
 
   return (
@@ -63,8 +68,8 @@ export function AbaDownload({ dados, filtros }: Props) {
       </div>
 
       {subAba === 'geral'   && <RelatorioGeral />}
-      {subAba === 'atual'   && <VisualizacaoAtual />}
-      {subAba === 'selecao' && <Selecao />}
+      {subAba === 'atual'   && <VisualizacaoAtual snapshot={exportSnapshot} />}
+      {subAba === 'selecao' && <Selecao snapshot={exportSnapshot} salasDisponiveis={salasDisponiveis} computadoresDisponiveis={computadoresDisponiveis} />}
       {subAba === 'editor'  && <Editor />}
     </div>
   );

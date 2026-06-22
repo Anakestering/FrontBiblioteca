@@ -69,10 +69,10 @@ function GrupoRecursos({ items, cor, label, diasFuturo, onHover, onLeave }: Grup
     <div className="card p-4 w-full self-start">
       {/* Cabecalho do grupo */}
       <div className="flex items-center justify-between mb-4">
-        <p className={`text-[10px] font-semibold uppercase tracking-widest ${corLabel}`}>
+        <p className={`text-[14px] font-semibold uppercase tracking-widest ${corLabel}`}>
           {label}
         </p>
-        <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+        <div className="flex items-center gap-3 text-[13px] text-[var(--text-muted)]">
           <span className="flex items-center gap-1">
             <span className={`inline-block w-2.5 h-1.5 rounded-sm ${corBarra}`} />
             Historico
@@ -101,23 +101,23 @@ function GrupoRecursos({ items, cor, label, diasFuturo, onHover, onLeave }: Grup
             >
               {/* Nome + valores */}
               <div className="flex items-baseline justify-between mb-1.5">
-                <span className={`text-xs truncate max-w-[55%] flex items-center gap-1 ${i === 0 && item.totalMinutosUsados > 0 ? 'font-bold text-[var(--text-primary)]' : 'font-medium text-[var(--text-primary)]'}`}>
+                <span className={`text-xm truncate max-w-[155%] flex items-center gap-1 ${i === 0 && item.totalMinutosUsados > 0 ? 'font-bold text-[var(--text-primary)]' : 'font-medium text-[var(--text-primary)]'}`}>
                   {i === 0 && item.totalMinutosUsados > 0 && (
-                    <span className={`text-[9px] ${cor === 'blue' ? 'text-blue-400' : 'text-violet-400'}`}>▲</span>
+                    <span className={`text-[10px] ${cor === 'blue' ? 'text-blue-400' : 'text-violet-400'}`}>▲</span>
                   )}
                   {item.nome}
                 </span>
-                <div className="flex items-center gap-2 text-[10px] shrink-0">
+                <div className="flex items-center gap-2 text-[14px] shrink-0">
                   <span className={`font-semibold ${corLabel}`}>
                     {minutosParaHoras(item.totalMinutosUsados)}
                   </span>
                   {item.minutosReservadosFuturos > 0 && (
-                    <span className="text-amber-400 font-semibold">
+                    <span className="text-amber-400 font-semibold text-[14px]">
                       +{minutosParaHoras(item.minutosReservadosFuturos)}
                     </span>
                   )}
                   {ocupacao !== null && (
-                    <span className="text-[var(--text-muted)]">{ocupacao}%</span>
+                    <span className="text-[var(--text-muted)] text-[14px]">{ocupacao}%</span>
                   )}
                 </div>
               </div>

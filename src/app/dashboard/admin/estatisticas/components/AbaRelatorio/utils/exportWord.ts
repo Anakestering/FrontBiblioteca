@@ -379,7 +379,7 @@ export function exportToWord(data: ReportData, filename = 'relatorio'): void {
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const date = new Date().toISOString().slice(0, 10);
+  const date = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
   a.href = url;
   a.download = `${filename}_${date}.docx`;
   document.body.appendChild(a);

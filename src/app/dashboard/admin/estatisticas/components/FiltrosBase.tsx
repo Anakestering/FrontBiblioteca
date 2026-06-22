@@ -39,7 +39,7 @@ export function FiltrosBarras({ filtros, globalVersao, loading, onAplicar, child
 
         {/* Período */}
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-[var(--text-muted)]">Período</label>
+          <label className="text-[14px] font-medium text-[var(--text-muted)]">Período</label>
           <div className="flex items-center gap-2">
             <select
               value={periodo}

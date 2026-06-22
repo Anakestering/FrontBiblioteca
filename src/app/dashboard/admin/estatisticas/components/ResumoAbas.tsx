@@ -28,7 +28,7 @@ export function ResumoAbas({ cards, loading }: Props) {
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {cards.map((card, i) => (
         <div key={i} className="card p-4 flex flex-col gap-1 min-w-0">
-          <span className={`text-[10px] font-semibold uppercase tracking-widest ${cores[card.cor]}`}>
+          <span className={`text-[12px] font-semibold uppercase tracking-widest ${cores[card.cor]}`}>
             {card.label}
           </span>
           {loading ? (
@@ -39,7 +39,7 @@ export function ResumoAbas({ cards, loading }: Props) {
             </span>
           )}
           {card.sub && !loading && (
-            <span className="text-xs text-[var(--text-muted)]">{card.sub}</span>
+            <span className="text-[14px] text-[var(--text-muted)]">{card.sub}</span>
           )}
         </div>
       ))}

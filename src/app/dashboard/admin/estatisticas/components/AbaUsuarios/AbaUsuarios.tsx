@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FiltrosRelatorio } from '../../page';
 import { FiltroPeriodoInline } from '../FiltroPeriodoInline';
 import { relatorios } from '@/lib/api';
 import { EstatisticasUsuariosDTO, DistribuicaoTipoDTO, RankingUsuarioDTO } from '@/types';
 import { toISOLocal, PeriodoFiltro, maskCpf } from '@/lib/utils';
+import type { SnapshotUsuarios } from '../AbaRelatorio/utils/types';
 
 interface Props {
   filtros: FiltrosRelatorio;
   globalVersao: number;
+  onSnapshot?: (s: SnapshotUsuarios) => void;
 }
 
 const TIPO_LABELS: Record<string, string> = {
@@ -341,7 +343,7 @@ function CardsResumo({ data, loading }: { data: EstatisticasUsuariosDTO | null; 
                         style={{ height: `${hPct}%` }}
                       />
                     </div>
-                    <span className="text-[7px] text-[var(--text-muted)] opacity-60">{mesAbrev}</span>
+                    <span className="text-[12px] text-[var(--text-muted)] opacity-60">{mesAbrev}</span>
                   </div>
                 );
               })}
@@ -781,7 +783,7 @@ function SecaoLista({ filtroGlobal }: { filtroGlobal: PeriodoFiltro }) {
 
 // ─── AbaUsuarios (export principal) ───────────────────────────────────────────
 
-export function AbaUsuarios({ filtros, globalVersao }: Props) {
+export function AbaUsuarios({ filtros, globalVersao, onSnapshot }: Props) {
   const [filtroGlobal, setFiltroGlobal] = useState<PeriodoFiltro>({
     inicio: filtros.inicio, fim: filtros.fim,
   });
@@ -793,6 +795,18 @@ export function AbaUsuarios({ filtros, globalVersao }: Props) {
   }, [globalVersao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: dataCards, loading: loadingCards } = useDadosUsuarios(filtroGlobal);
+
+  // Snapshot para exportação
+  const snapshotRef = useRef(onSnapshot);
+  useEffect(() => { snapshotRef.current = onSnapshot; }, [onSnapshot]);
+
+  useEffect(() => {
+    if (loadingCards) return;
+    snapshotRef.current?.({
+      periodo: { inicio: filtroGlobal.inicio, fim: filtroGlobal.fim },
+      data: dataCards,
+    });
+  }, [dataCards, loadingCards, filtroGlobal.inicio, filtroGlobal.fim]);
 
   return (
     <div className="space-y-5">

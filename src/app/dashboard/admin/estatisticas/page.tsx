@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { registerLocale } from 'react-datepicker';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { AbaHistorico } from './components/AbaHistorico/Page';
@@ -9,6 +9,7 @@ import { AbaDownload } from './components/AbaRelatorio/AbaRelatorio';
 import { FiltroPeriodoInline } from './components/FiltroPeriodoInline';
 import { PeriodoFiltro, toISOLocal } from '@/lib/utils';
 import { relatorios } from '@/lib/api';
+import type { ExportSnapshot, SnapshotHistorico, SnapshotUsuarios } from './components/AbaRelatorio/utils/types';
 import { EstatisticasRecursoDTO, EstatisticasStatusReservasDTO, EstatisticasHeatmapDTO } from '@/types';
 import { salas as salasApi, computadores as computadoresApi } from '@/lib/api';
 import { Sala, Computador } from '@/types';
@@ -60,6 +61,10 @@ export default function EstatisticasPage() {
   const [heatmapData, setHeatmapData]         = useState<EstatisticasHeatmapDTO[]>([]);
   const [loadingHeatmap, setLoadingHeatmap]   = useState(false);
   const [modoHeatmap, setModoHeatmap]         = useState<'media' | 'total'>('total');
+  const [exportSnapshot, setExportSnapshot] = useState<ExportSnapshot | null>(null);
+  const snapshotHistoricoRef = useRef<SnapshotHistorico | null>(null);
+  const snapshotUsuariosRef  = useRef<SnapshotUsuarios  | null>(null);
+
   const [salasDisponiveis, setSalasDisponiveis]               = useState<Sala[]>([]);
   const [computadoresDisponiveis, setComputadoresDisponiveis] = useState<Computador[]>([]);
 
@@ -122,6 +127,43 @@ export default function EstatisticasPage() {
     });
   }, [buscarHeatmap, buscarRecursos]);
 
+  const buildSnapshot = useCallback((
+    historico: SnapshotHistorico | null,
+    usuarios: SnapshotUsuarios | null,
+    recursos: DadosRecursos,
+    filtrosAtivos: FiltrosRelatorio,
+  ): ExportSnapshot => ({
+    capturedAt: new Date(),
+    filtrosGlobais: { inicio: filtrosAtivos.inicio, fim: filtrosAtivos.fim },
+    historico,
+    usuarios,
+    recursos: {
+      periodo: { inicio: filtrosAtivos.inicio, fim: filtrosAtivos.fim },
+      salas: recursos.salas,
+      computadores: recursos.computadores,
+      status: recursos.status,
+      diasFuturo: filtrosAtivos.diasFuturo ?? 30,
+    },
+  }), []);
+
+  const handleHistoricoSnapshot = useCallback((s: SnapshotHistorico) => {
+    snapshotHistoricoRef.current = s;
+    setExportSnapshot(prev => buildSnapshot(s, snapshotUsuariosRef.current, dadosRecursos, filtros));
+  }, [buildSnapshot, dadosRecursos, filtros]);
+
+  const handleUsuariosSnapshot = useCallback((s: SnapshotUsuarios) => {
+    snapshotUsuariosRef.current = s;
+    setExportSnapshot(prev => buildSnapshot(snapshotHistoricoRef.current, s, dadosRecursos, filtros));
+  }, [buildSnapshot, dadosRecursos, filtros]);
+
+  // Atualiza snapshot de recursos sempre que dadosRecursos muda
+  useEffect(() => {
+    setExportSnapshot(prev => {
+      if (!prev && !snapshotHistoricoRef.current && !snapshotUsuariosRef.current) return prev;
+      return buildSnapshot(snapshotHistoricoRef.current, snapshotUsuariosRef.current, dadosRecursos, filtros);
+    });
+  }, [dadosRecursos, buildSnapshot, filtros]);
+
   const handleAplicarGlobal = (periodo: PeriodoFiltro) => {
     const novos: FiltrosRelatorio = { ...filtros, ...periodo };
     setFiltros(novos);
@@ -181,6 +223,7 @@ export default function EstatisticasPage() {
           onBuscarHeatmap={buscarHeatmap}
           modoHeatmap={modoHeatmap}
           onModoHeatmap={setModoHeatmap}
+          onSnapshot={handleHistoricoSnapshot}
         />
       </div>
       <div style={{ display: aba === 'recursos' ? undefined : 'none' }}>
@@ -196,10 +239,10 @@ export default function EstatisticasPage() {
         />
       </div>
       <div style={{ display: aba === 'usuarios' ? undefined : 'none' }}>
-        <AbaUsuarios filtros={filtros} globalVersao={globalVersao} />
+        <AbaUsuarios filtros={filtros} globalVersao={globalVersao} onSnapshot={handleUsuariosSnapshot} />
       </div>
       <div style={{ display: aba === 'download' ? undefined : 'none' }}>
-        <AbaDownload dados={dadosRecursos} filtros={filtros} />
+        <AbaDownload dados={dadosRecursos} filtros={filtros} exportSnapshot={exportSnapshot} salasDisponiveis={salasDisponiveis} computadoresDisponiveis={computadoresDisponiveis} />
       </div>
     </div>
   );

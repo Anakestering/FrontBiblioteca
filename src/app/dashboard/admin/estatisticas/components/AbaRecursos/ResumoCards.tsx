@@ -42,7 +42,7 @@ interface CardDuploProps {
 function CardDuplo({ label, corLabel, linhas, loading }: CardDuploProps) {
   return (
     <div className="card p-4 flex flex-col gap-2 min-w-0">
-      <span className={`text-[10px] font-semibold uppercase tracking-widest ${corLabel}`}>
+      <span className={`text-[12px] font-semibold uppercase tracking-widest ${corLabel}`}>
         {label}
       </span>
       {loading ? (
@@ -62,7 +62,7 @@ function CardDuplo({ label, corLabel, linhas, loading }: CardDuploProps) {
         <div className="grid grid-cols-2 gap-3 mt-0.5">
           {linhas.map((l, i) => (
             <div key={i}>
-              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              <span className="text-[12px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
                 {l.icone} {l.titulo}
               </span>
               <p
@@ -98,7 +98,7 @@ interface CardSimplesProps {
 function CardSimples({ label, valor, sub, corLabel, loading }: CardSimplesProps) {
   return (
     <div className="card p-4 flex flex-col gap-1 min-w-0">
-      <span className={`text-[10px] font-semibold uppercase tracking-widest ${corLabel}`}>
+      <span className={`text-[12px] font-semibold uppercase tracking-widest ${corLabel}`}>
         {label}
       </span>
       {loading ? (
@@ -109,7 +109,7 @@ function CardSimples({ label, valor, sub, corLabel, loading }: CardSimplesProps)
         </span>
       )}
       {sub && !loading && (
-        <span className="text-xs text-[var(--text-muted)]">{sub}</span>
+        <span className="text-[14px] text-[var(--text-muted)]">{sub}</span>
       )}
     </div>
   );

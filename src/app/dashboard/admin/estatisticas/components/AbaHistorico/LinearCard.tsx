@@ -171,7 +171,7 @@ function ToggleLinha({ ativo, onChange, cor, dashed, label, disabled }: TogglePr
     <button
       onClick={() => !disabled && onChange(!ativo)}
       disabled={disabled}
-      className={`flex items-center gap-1.5 text-xs transition-all rounded px-1.5 py-1 ${
+      className={`flex items-center gap-1.5 text-[14px] transition-all rounded px-1.5 py-1 ${
         disabled
           ? 'opacity-30 cursor-not-allowed'
           : ativo
@@ -474,7 +474,7 @@ export function LinearCard({ filtros, globalVersao, onDadosChange }: Props) {
                 className={`text-xs px-3 py-1.5 rounded-md font-medium transition-all ${
                   agrupamento === a
                     ? 'bg-violet-600 text-white shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                    : 'text-[var(--text-muted)] text-[13px] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {a === 'dia' ? 'Dia' : a === 'semana' ? 'Semana' : 'Mês'}
