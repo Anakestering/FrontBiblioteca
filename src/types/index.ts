@@ -17,6 +17,7 @@ export type StatusReserva =
   | 'PENDENTE_APROVACAO'
   | 'APROVADA'
   | 'CANCELADA'
+  | 'LIBERADA_ANTECIPADA'
   | 'ATRASADO'
   | 'EM_ANDAMENTO'
   | 'FINALIZADA'
