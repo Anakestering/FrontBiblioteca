@@ -82,7 +82,6 @@ export function PedidoDetailModal({ pedido, aprovacoes, onClose, onRefresh }: Pe
             : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
             {isPc ? 'COMPUTADOR' : 'SALA'}
           </span>
-          <span className="text-xs text-[var(--text-muted)]">Pedido #{pedido.id}</span>
         </div>
       }
       onClose={onClose}

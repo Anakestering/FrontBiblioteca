@@ -236,9 +236,12 @@ export default function AdminDashboard() {
     .map(r => r.sala?.nome ?? '—');
 
   // Filtra as linhas do dia selecionado consumindo a lista armazenada no cache
+  const STATUS_VISIVEIS = new Set(['EM_ANDAMENTO', 'PENDENTE_APROVACAO', 'APROVADA']);
+
   const pedidosDiaFiltrados = useMemo(() => {
     return pedidosSemanaAtual
       .filter(p => isSameDay(new Date(p.inicioPrevisto), selectedDay))
+      .filter(p => STATUS_VISIVEIS.has(p.status))
       .filter(p => filtroSemana === 'todos' || p.tipo === filtroSemana)
       .sort((a, b) => new Date(a.inicioPrevisto).getTime() - new Date(b.inicioPrevisto).getTime());
   }, [pedidosSemanaAtual, selectedDay, filtroSemana]);
@@ -419,9 +422,10 @@ export default function AdminDashboard() {
               const isToday = isSameDay(day, today);
               const isSelected = isSameDay(day, selectedDay);
 
-              const dp = pedidosSemanaAtual.filter(p => p.tipo === 'COMPUTADOR' && isSameDay(new Date(p.inicioPrevisto), day)).length;
-              const ds = pedidosSemanaAtual.filter(p => p.tipo === 'SALA' && isSameDay(new Date(p.inicioPrevisto), day)).length;
-              const temCheckinPendente = pedidosSemanaAtual.some(p => isSameDay(new Date(p.inicioPrevisto), day) && (p.naJanelaCheckin ?? false));
+              const pedidosDia = pedidosSemanaAtual.filter(p => isSameDay(new Date(p.inicioPrevisto), day) && STATUS_VISIVEIS.has(p.status));
+              const dp = pedidosDia.filter(p => p.tipo === 'COMPUTADOR').length;
+              const ds = pedidosDia.filter(p => p.tipo === 'SALA').length;
+              const temCheckinPendente = pedidosDia.some(p => p.naJanelaCheckin ?? false);
 
               return (
                 <button key={i} onClick={() => setSelectedDay(day)}
@@ -480,6 +484,10 @@ export default function AdminDashboard() {
                     ? formatTime(primeiraReserva.checkoutEm)
                     : formatTime(p.fimPrevisto);
 
+                  const nomesRecursos = isPc
+                    ? (p.reservasComputador ?? []).map(r => r.computador?.codigo).filter(Boolean).join(', ')
+                    : (p.reservasSala ?? []).map(r => r.sala?.nome).filter(Boolean).join(', ');
+
                   return (
                     <button key={p.id} onClick={() => setSelectedPedido(p)}
                       className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors gap-3 text-left ${checkinPendente
@@ -494,7 +502,7 @@ export default function AdminDashboard() {
                           {isPc ? 'PC' : 'SALA'}
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">{nomeItem}</p>
+                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">{nomesRecursos ? `${qtd} | ${nomesRecursos}` : nomeItem}</p>
                           <p className="text-xs text-[var(--text-muted)]">{p.usuario?.nome}</p>
                         </div>
                       </div>
@@ -512,6 +520,7 @@ export default function AdminDashboard() {
                 })}
               </div>
             )}
+
           </div>
         </div>
       </div>

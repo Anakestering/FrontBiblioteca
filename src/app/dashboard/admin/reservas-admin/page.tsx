@@ -114,7 +114,7 @@ function DetalheModal({ pedido, aprovacoes, onClose, onRefresh }: {
     }
   };
 
-  const modalTitle = `${isPC ? 'PC' : 'SALA'} — Pedido #${pedido.id}`;
+  const modalTitle = isPC ? 'COMPUTADOR' : 'SALA';
 
   return (
     <Modal title={modalTitle} onClose={onClose} maxWidth="lg">
@@ -272,6 +272,9 @@ function DetalheModal({ pedido, aprovacoes, onClose, onRefresh }: {
 
 function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () => void }) {
   const isPC = pedido.tipo === 'COMPUTADOR';
+  const nomes = isPC
+    ? (pedido.reservasComputador ?? []).map(r => r.computador?.codigo).filter(Boolean).join(', ')
+    : (pedido.reservasSala ?? []).map(r => r.sala?.nome).filter(Boolean).join(', ');
   const qtd = isPC ? (pedido.reservasComputador?.length ?? 0) : (pedido.reservasSala?.length ?? 0);
   const labelItem = isPC ? `${qtd} computador${qtd !== 1 ? 'es' : ''}` : `${qtd} sala${qtd !== 1 ? 's' : ''}`;
   const encerrado = STATUS_ENCERRADAS.includes(pedido.status);
@@ -290,18 +293,18 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick: () =>
               {isPC ? 'PC' : 'SALA'}
             </span>
             <span className="text-sm font-medium text-[var(--text-primary)]">
-              {labelItem}
+              {nomes ? `${qtd} | ${nomes}` : labelItem}
             </span>
           </div>
           <p className="text-xs text-[var(--text-muted)] truncate">
-            {pedido.usuario?.nome} · <span className="font-mono">{pedido.usuario?.email}</span>
+            {pedido.usuario?.nome}
           </p>
         </div>
         <div className="shrink-0 text-right hidden sm:block">
           <p className="text-sm font-semibold text-[var(--text-primary)]">
             {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
           </p>
-          <p className="text-xs text-[var(--text-muted)]">{formatDataCurta(pedido.inicioPrevisto)}</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{formatDataCurta(pedido.inicioPrevisto)}</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className={`badge text-xs ${statusReservaColor[pedido.status] || ''}`}>

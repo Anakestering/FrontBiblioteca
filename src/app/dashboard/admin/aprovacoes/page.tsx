@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-// Importamos pedidos para usar a nova busca inteligente do servidor
 import { aprovacoes as aprovacaoApi, pedidos as pedidosApi } from '@/lib/api';
 import { AprovacaoReserva } from '@/types';
 import { formatDate, maskCpf, maskTel } from '@/lib/utils';
@@ -9,11 +8,17 @@ import { Alert } from '@/app/components/ui/ErrorAlert';
 import { LoadingList } from '@/app/components/ui/LoadingList';
 import { EmptyState } from '@/app/components/ui/EmptyState';
 import { Modal } from '@/app/components/ui/Modal';
+import { DateRangePicker } from '@/app/components/ui/DateRangePicker';
 
 type FiltroTipo = 'todos' | 'COMPUTADOR' | 'SALA';
+type PeriodoOpcao = 'TODOS' | 'HOJE' | '7_DIAS' | 'MES_ATUAL' | 'CUSTOMIZADO';
 
 function formatHora(iso: string) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDataCurta(iso: string) {
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 // ─── Modal de detalhes ────────────────────────────────────────────────────────
@@ -173,12 +178,11 @@ function DetalheModal({ ap, onClose, onDecisao }: {
 function AprovacaoCard({ ap, onClick }: { ap: AprovacaoReserva; onClick: () => void }) {
   const pedido = ap.pedido;
   const isPC = pedido.tipo === 'COMPUTADOR';
-  const itens = isPC
-    ? pedido.reservasComputador.map(r => r.computador.codigo).join(', ')
-    : pedido.reservasSala.map(r => r.sala.nome).join(', ');
-  const qtdItens = isPC
-    ? pedido.reservasComputador.length
-    : pedido.reservasSala.length;
+  const nomes = isPC
+    ? pedido.reservasComputador.map(r => r.computador?.codigo).filter(Boolean).join(', ')
+    : pedido.reservasSala.map(r => r.sala?.nome).filter(Boolean).join(', ');
+  const qtd = isPC ? pedido.reservasComputador.length : pedido.reservasSala.length;
+  const labelItem = isPC ? `${qtd} computador${qtd !== 1 ? 'es' : ''}` : `${qtd} sala${qtd !== 1 ? 's' : ''}`;
 
   return (
     <div
@@ -187,28 +191,27 @@ function AprovacaoCard({ ap, onClick }: { ap: AprovacaoReserva; onClick: () => v
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${isPC
               ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
               : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'}`}>
-              {isPC ? 'COMPUTADOR' : 'SALA'}
+              {isPC ? 'PC' : 'SALA'}
             </span>
-            <span className="text-sm font-semibold text-[var(--text-primary)]">
-              {qtdItens} {isPC ? `computador${qtdItens !== 1 ? 'es' : ''}` : `sala${qtdItens !== 1 ? 's' : ''}`}
+            <span className="text-sm font-medium text-[var(--text-primary)] truncate">
+              {nomes ? `${qtd} | ${nomes}` : labelItem}
             </span>
           </div>
-          <p className="text-xs text-[var(--text-muted)] truncate">{itens}</p>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">
-            {pedido.usuario.nome} · <span className="font-mono">{pedido.usuario.email}</span>
+          <p className="text-xs text-[var(--text-muted)] truncate">
+            {pedido.usuario.nome}
           </p>
         </div>
 
-        <div className="shrink-0 text-center hidden sm:block">
+        <div className="shrink-0 text-right hidden sm:block">
           <p className="text-sm font-semibold text-[var(--text-primary)]">
             {formatHora(pedido.inicioPrevisto)} → {formatHora(pedido.fimPrevisto)}
           </p>
-          <p className="text-xs text-[var(--text-muted)]">
-            {formatDate(pedido.inicioPrevisto)}
+          <p className="text-sm font-semibold text-[var(--text-primary)]">
+            {formatDataCurta(pedido.inicioPrevisto)}
           </p>
         </div>
 
@@ -226,8 +229,13 @@ export default function AprovacoesPage() {
   const [list, setList] = useState<AprovacaoReserva[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>('todos');
-  const [search, setSearch] = useState(''); // <-- Novo estado para a busca por texto
+  const [periodo, setPeriodo] = useState<PeriodoOpcao>('TODOS');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [search, setSearch] = useState('');
   const [selecionada, setSelecionada] = useState<AprovacaoReserva | null>(null);
+
+  const today = new Date().toISOString().split('T')[0];
 
   const loadList = async () => {
     setLoading(true);
@@ -274,8 +282,23 @@ export default function AprovacoesPage() {
   }, [list]);
 
   const listFiltrada = useMemo(() => {
-    return list.filter(ap => filtroTipo === 'todos' || ap.pedido.tipo === filtroTipo);
-  }, [list, filtroTipo]);
+    return list.filter(ap => {
+      if (filtroTipo !== 'todos' && ap.pedido.tipo !== filtroTipo) return false;
+
+      const dataReserva = ap.pedido.inicioPrevisto.slice(0, 10);
+
+      if (periodo === 'HOJE') {
+        if (dataReserva !== today) return false;
+      } else if (periodo === 'MES_ATUAL') {
+        if (!dataReserva.startsWith(today.slice(0, 7))) return false;
+      } else if (periodo === 'CUSTOMIZADO') {
+        if (dataInicio && dataReserva < dataInicio) return false;
+        if (dataFim && dataReserva > dataFim) return false;
+      }
+
+      return true;
+    });
+  }, [list, filtroTipo, periodo, dataInicio, dataFim, today]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -286,15 +309,15 @@ export default function AprovacoesPage() {
 
       {/* Filtros e Barra de Pesquisa */}
       <div className="space-y-3">
-        <input 
+        <input
           type="text"
-          placeholder="Buscar pendentes por usuário, e-mail, PC ou sala..."
-          value={search} 
+          placeholder="Buscar por usuário, PC ou sala..."
+          value={search}
           onChange={e => setSearch(e.target.value)}
-          className="input-field w-full sm:max-w-md" 
+          className="input-field w-full sm:max-w-md"
         />
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setFiltroTipo('todos')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filtroTipo === 'todos'
@@ -319,6 +342,29 @@ export default function AprovacoesPage() {
           >
             Salas ({salaCount})
           </button>
+
+          <div className="flex items-center gap-2 ml-auto">
+            {periodo === 'CUSTOMIZADO' && (
+              <DateRangePicker
+                startDate={dataInicio ? new Date(dataInicio + 'T00:00:00') : null}
+                endDate={dataFim ? new Date(dataFim + 'T00:00:00') : null}
+                onChange={([start, end]) => {
+                  if (start) setDataInicio(start.toISOString().split('T')[0]);
+                  setDataFim(end ? end.toISOString().split('T')[0] : '');
+                }}
+              />
+            )}
+            <select
+              value={periodo}
+              onChange={e => setPeriodo(e.target.value as PeriodoOpcao)}
+              className="input-field w-40 shrink-0"
+            >
+              <option value="TODOS">Todas as datas</option>
+              <option value="HOJE">Hoje</option>
+              <option value="MES_ATUAL">Mês Atual</option>
+              <option value="CUSTOMIZADO">Personalizado</option>
+            </select>
+          </div>
         </div>
       </div>
 

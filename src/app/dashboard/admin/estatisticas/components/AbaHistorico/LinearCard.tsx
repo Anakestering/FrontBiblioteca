@@ -112,7 +112,7 @@ function Tooltip({ state, visReservas, visAbandono, visTendencia, visTendenciaAb
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c3aed', flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: '#e5e7eb' }}>
                 <strong style={{ color: '#fff' }}>{state.total}</strong>
-                <span style={{ color: '#9ca3af', marginLeft: 4 }}>pedidos finalizados</span>
+                <span style={{ color: '#9ca3af', marginLeft: 4 }}>reservas finalizadas</span>
               </span>
             </div>
           )}
@@ -120,7 +120,7 @@ function Tooltip({ state, visReservas, visAbandono, visTendencia, visTendenciaAb
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 14 }}>
               <span style={{ fontSize: 12, color: '#e5e7eb' }}>
                 <strong style={{ color: '#c4b5fd' }}>{state.totalReservas}</strong>
-                <span style={{ color: '#9ca3af', marginLeft: 4 }}>reservas finalizadas</span>
+                <span style={{ color: '#9ca3af', marginLeft: 4 }}>pedidos</span>
               </span>
             </div>
           )}
@@ -512,14 +512,14 @@ export function LinearCard({ filtros, globalVersao, onDadosChange }: Props) {
             ativo={visReservas}
             onChange={setVisReservas}
             cor="#7c3aed"
-            label="Pedidos"
+            label="Reservas"
           />
           <ToggleLinha
             ativo={visTendencia}
             onChange={setVisTendencia}
             cor="#a78bfa"
             dashed
-            label={`Tendência pedido`}
+            label="Tendência reservas"
           />
           <ToggleLinha
             ativo={visAbandono}
