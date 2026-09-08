@@ -2,10 +2,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { registerLocale } from 'react-datepicker';
 import { ptBR } from 'date-fns/locale/pt-BR';
-import { AbaHistorico } from './components/AbaHistorico/Page';
-import { AbaRecursos } from './components/AbaRecursos/page';
-import { AbaUsuarios } from './components/AbaUsuarios/page';
-import { AbaDownload } from './components/AbaRelatorio/page';
+import { AbaHistorico } from './components/AbaHistorico/AbaHistorico';
+import { AbaRecursos } from './components/AbaRecursos/AbaRecursos';
+import { AbaUsuarios } from './components/AbaUsuarios/AbaUsuarios';
+import { AbaDownload } from './components/AbaRelatorio/AbaDownload';
 import { FiltroPeriodoInline } from './components/FiltroPeriodoInline';
 import { PeriodoFiltro, toISOLocal } from '@/lib/utils';
 import { relatorios } from '@/lib/api';
