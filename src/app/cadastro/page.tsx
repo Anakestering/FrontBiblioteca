@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/api';
 import { maskCpf } from '@/lib/utils';
 import { TipoUsuario, UsuarioOutroInfo } from '@/types';
+import { ThemeToggle } from '@/app/components/ui/ThemeToggle';
 
 const TIPO_USUARIO_LABELS: Record<TipoUsuario, string> = {
   SENAI: 'Senai',
@@ -65,6 +66,9 @@ export default function CadastroPage() {
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/8 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-800/6 rounded-full blur-3xl" />
+      </div>
+      <div className="fixed top-4 right-4">
+        <ThemeToggle />
       </div>
 
       <div className="w-full max-w-[460px] slide-in">

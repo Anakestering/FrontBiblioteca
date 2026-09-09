@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { auth } from '@/lib/api';
 import { PasswordInput } from '@/app/components/ui/PasswordInput';
+import { ThemeToggle } from '@/app/components/ui/ThemeToggle';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -127,6 +128,9 @@ export default function LoginPage() {
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/8 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-800/6 rounded-full blur-3xl" />
+      </div>
+      <div className="fixed top-4 right-4">
+        <ThemeToggle />
       </div>
       <Suspense>
         <LoginForm />

@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { PasswordInput } from '@/app/components/ui/PasswordInput';
 import { CodigoInput } from '@/app/components/ui/CodigoInput';
+import { ThemeToggle } from '@/app/components/ui/ThemeToggle';
 
 export default function RecuperarSenhaPage() {
     const [email, setEmail] = useState('');
@@ -136,6 +137,10 @@ export default function RecuperarSenhaPage() {
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/8 rounded-full blur-3xl" />
                 <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-800/6 rounded-full blur-3xl" />
+            </div>
+
+            <div className="fixed top-4 right-4">
+                <ThemeToggle />
             </div>
 
             <div className="w-full max-w-[420px] slide-in">
