@@ -157,7 +157,7 @@ function PedidoModal({
         {checkinExpirou && (
           <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
             <p className="text-sm text-rose-600 dark:text-rose-400">
-              ⚠️ Prazo de check-in encerrado. Esta reserva será marcada como atrasada.
+              Prazo de check-in encerrado. Esta reserva será marcada como atrasada.
             </p>
           </div>
         )}
@@ -280,12 +280,12 @@ export function PedidoCard({ pedido, onClick }: { pedido: PedidoReserva; onClick
 
           {podeCheckin && (
             <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-pulse block mt-0.5">
-              ● Check-in disponível!
+              Check-in disponível!
             </span>
           )}
           {checkinExpirou && (
             <span className="text-xs font-semibold text-rose-500 block mt-0.5">
-              ⚠ Check-in expirado
+              Check-in expirado
             </span>
           )}
           {mostrarCountdown && (

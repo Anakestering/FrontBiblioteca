@@ -213,7 +213,7 @@ export function HeatmapCard({ heatmap, loadingHeatmap, modoHeatmap, onModoHeatma
                                 </div>
                             </div>
                         ))}
-                        <span className="text-xs text-[var(--text-muted)]">Mais</span>
+                        <span className="text-[10px] text-[var(--text-muted)]">Mais</span>
                     </div>
                 </div>
             )}

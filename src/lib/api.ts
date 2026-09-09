@@ -13,8 +13,8 @@ import {
   EstatisticasRecursoDTO,
   EstatisticasHistoricoDTO,
   EstatisticasResumoDTO,
-  EstatisticasOcupacaoDiaDTO,
   EstatisticasUsuariosDTO,
+  EstatisticasOcupacaoDiaDTO,
   TipoUsuario,
   UsuarioOutroInfo,
 } from '@/types';
@@ -49,7 +49,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
   }
 
-
   if (res.status === 204) return undefined as T;
 
   const contentType = res.headers.get('content-type');
@@ -60,9 +59,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   return (await res.text()) as T;
 }
-
-
-
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export const auth = {
@@ -189,6 +185,8 @@ export const usuarios = {
   deletar: (id: number) => request<void>(`/usuarios/${id}`, { method: 'DELETE' }),
   ativar: (id: number) =>
     request(`/usuarios/${id}/ativar`, { method: 'PUT' }),
+  desativar: (id: number) =>
+    request<void>(`/usuarios/${id}/desativar`, { method: 'PUT' }),
   trocarSenha: (dto: TrocarSenhaDTO) =>
     request<{ message: string }>('/usuarios/me/senha', { method: 'PATCH', body: JSON.stringify(dto) }),
   stats: () => request<{ total: number; ativos: number; cadastradosNaSemana: number }>('/usuarios/stats'),
@@ -197,19 +195,21 @@ export const usuarios = {
 
 // ─── Estatisticas ───────────────────────────────────────────────────────────────
 export const relatorios = {
-  salas: (params: { inicio?: string; fim?: string; salaIds: number[] }) => {
+  salas: (params: { inicio?: string; fim?: string; salaIds: number[]; diasFuturo?: number }) => {
     const query = new URLSearchParams();
     if (params.inicio) query.set('inicio', params.inicio);
     if (params.fim) query.set('fim', params.fim);
     params.salaIds.forEach(id => query.append('salaIds', String(id)));
+    if (params.diasFuturo != null) query.set('diasFuturo', String(params.diasFuturo));
     return request<EstatisticasRecursoDTO[]>(`/estatisticas/salas/recursos?${query}`);
   },
 
-  computadores: (params: { inicio?: string; fim?: string; computadorIds: number[] }) => {
+  computadores: (params: { inicio?: string; fim?: string; computadorIds: number[]; diasFuturo?: number }) => {
     const query = new URLSearchParams();
     if (params.inicio) query.set('inicio', params.inicio);
     if (params.fim) query.set('fim', params.fim);
     params.computadorIds.forEach(id => query.append('computadorIds', String(id)));
+    if (params.diasFuturo != null) query.set('diasFuturo', String(params.diasFuturo));
     return request<EstatisticasRecursoDTO[]>(`/estatisticas/computadores/recursos?${query}`);
   },
 
@@ -255,6 +255,7 @@ export const relatorios = {
     const query = new URLSearchParams();
     if (params.inicio) query.set('inicio', params.inicio);
     if (params.fim) query.set('fim', params.fim);
-    return request<EstatisticasUsuariosDTO>(`/estatisticas/usuarios/estatisticas?${query}`);
+    return request<EstatisticasUsuariosDTO>(`/estatisticas/usuarios?${query}`);
   },
 };
+

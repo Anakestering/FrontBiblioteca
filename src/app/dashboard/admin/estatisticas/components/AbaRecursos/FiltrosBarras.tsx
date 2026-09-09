@@ -6,13 +6,19 @@ import { Sala, Computador } from '@/types';
 interface Props {
   salaIds: number[];
   computadorIds: number[];
+  diasFuturo: number;
   onChangeSalas: (ids: number[]) => void;
   onChangePcs: (ids: number[]) => void;
+  onChangeDiasFuturo: (dias: number) => void;
   salasDisponiveis: Sala[];
   computadoresDisponiveis: Computador[];
 }
 
-export function FiltrosRecursos({ salaIds, computadorIds, onChangeSalas, onChangePcs, salasDisponiveis, computadoresDisponiveis }: Props) {
+export function FiltrosRecursos({
+  salaIds, computadorIds, diasFuturo,
+  onChangeSalas, onChangePcs, onChangeDiasFuturo,
+  salasDisponiveis, computadoresDisponiveis,
+}: Props) {
   const [dropdownSalas, setDropdownSalas] = useState(false);
   const [dropdownPcs, setDropdownPcs] = useState(false);
 
@@ -29,6 +35,19 @@ export function FiltrosRecursos({ salaIds, computadorIds, onChangeSalas, onChang
 
   return (
     <>
+      {/* Select: período futuro */}
+      <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-sm">
+        <span className="text-[var(--text-muted)]">Prox:</span>
+        <select
+          value={diasFuturo}
+          onChange={e => onChangeDiasFuturo(Number(e.target.value))}
+          className="bg-transparent text-[var(--text-primary)] font-medium focus:outline-none cursor-pointer"
+        >
+          <option value={7}>7 dias</option>
+          <option value={30}>30 dias</option>
+        </select>
+      </div>
+
       {/* Dropdown PCs */}
       {computadoresDisponiveis.length > 0 && (
         <div className="relative dropdown-recursos">
@@ -61,7 +80,11 @@ export function FiltrosRecursos({ salaIds, computadorIds, onChangeSalas, onChang
                   <input
                     type="checkbox"
                     checked={computadorIds.includes(c.id)}
-                    onChange={() => onChangePcs(computadorIds.includes(c.id) ? computadorIds.filter(x => x !== c.id) : [...computadorIds, c.id])}
+                    onChange={() => onChangePcs(
+                      computadorIds.includes(c.id)
+                        ? computadorIds.filter(x => x !== c.id)
+                        : [...computadorIds, c.id]
+                    )}
                     className="accent-blue-600 w-4 h-4"
                   />
                   <span className="text-sm text-[var(--text-primary)]">{c.codigo}</span>
@@ -104,7 +127,11 @@ export function FiltrosRecursos({ salaIds, computadorIds, onChangeSalas, onChang
                   <input
                     type="checkbox"
                     checked={salaIds.includes(s.id)}
-                    onChange={() => onChangeSalas(salaIds.includes(s.id) ? salaIds.filter(x => x !== s.id) : [...salaIds, s.id])}
+                    onChange={() => onChangeSalas(
+                      salaIds.includes(s.id)
+                        ? salaIds.filter(x => x !== s.id)
+                        : [...salaIds, s.id]
+                    )}
                     className="accent-violet-600 w-4 h-4"
                   />
                   <span className="text-sm text-[var(--text-primary)]">{s.nome}</span>

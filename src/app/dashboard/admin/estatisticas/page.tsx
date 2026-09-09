@@ -1,15 +1,16 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { registerLocale } from 'react-datepicker';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { AbaHistorico } from './components/AbaHistorico/AbaHistorico';
 import { AbaRecursos } from './components/AbaRecursos/AbaRecursos';
 import { AbaUsuarios } from './components/AbaUsuarios/AbaUsuarios';
-import { AbaDownload } from './components/AbaRelatorio/AbaDownload';
+import { AbaDownload } from './components/AbaRelatorio/AbaRelatorio';
 import { FiltroPeriodoInline } from './components/FiltroPeriodoInline';
 import { PeriodoFiltro, toISOLocal } from '@/lib/utils';
 import { relatorios } from '@/lib/api';
-import { EstatisticasRecursoDTO, EstatisticasStatusReservasDTO, EstatisticasHeatmapDTO, EstatisticasResumoDTO } from '@/types';
+import type { ExportSnapshot, SnapshotHistorico, SnapshotUsuarios } from './components/AbaRelatorio/utils/types';
+import { EstatisticasRecursoDTO, EstatisticasStatusReservasDTO, EstatisticasHeatmapDTO } from '@/types';
 import { salas as salasApi, computadores as computadoresApi } from '@/lib/api';
 import { Sala, Computador } from '@/types';
 
@@ -22,6 +23,7 @@ export interface FiltrosRelatorio {
   fim: Date | null;
   salaIds: number[];
   computadorIds: number[];
+  diasFuturo?: number;
 }
 
 export interface DadosRecursos {
@@ -38,7 +40,6 @@ function getInicioSemana(): Date {
   return seg;
 }
 
-
 export default function EstatisticasPage() {
   const [aba, setAba] = useState<Aba>('historico');
 
@@ -49,7 +50,6 @@ export default function EstatisticasPage() {
     computadorIds: [],
   });
 
-  // Incrementado toda vez que o global é aplicado — cards usam para sincronizar
   const [globalVersao, setGlobalVersao] = useState(0);
 
   const [dadosRecursos, setDadosRecursos] = useState<DadosRecursos>({
@@ -60,10 +60,13 @@ export default function EstatisticasPage() {
   const [jaCarregou, setJaCarregou]           = useState(false);
   const [heatmapData, setHeatmapData]         = useState<EstatisticasHeatmapDTO[]>([]);
   const [loadingHeatmap, setLoadingHeatmap]   = useState(false);
-  const [modoHeatmap, setModoHeatmap]         = useState<'media' | 'total'>('media');
-  const [salasDisponiveis, setSalasDisponiveis]             = useState<Sala[]>([]);
-  const [computadoresDisponiveis, setComputadoresDisponiveis] = useState<Computador[]>([]);
+  const [modoHeatmap, setModoHeatmap]         = useState<'media' | 'total'>('total');
+  const [exportSnapshot, setExportSnapshot] = useState<ExportSnapshot | null>(null);
+  const snapshotHistoricoRef = useRef<SnapshotHistorico | null>(null);
+  const snapshotUsuariosRef  = useRef<SnapshotUsuarios  | null>(null);
 
+  const [salasDisponiveis, setSalasDisponiveis]               = useState<Sala[]>([]);
+  const [computadoresDisponiveis, setComputadoresDisponiveis] = useState<Computador[]>([]);
 
   const buscarHeatmap = useCallback(async (f: FiltrosRelatorio) => {
     setLoadingHeatmap(true);
@@ -90,8 +93,12 @@ export default function EstatisticasPage() {
         fim:    f.fim    ? toISOLocal(f.fim, true) : undefined,
       };
       const [salasData, computadoresData, statusData] = await Promise.all([
-        f.salaIds.length > 0 ? relatorios.salas({ ...params, salaIds: f.salaIds }) : Promise.resolve([]),
-        f.computadorIds.length > 0 ? relatorios.computadores({ ...params, computadorIds: f.computadorIds }) : Promise.resolve([]),
+        f.salaIds.length > 0
+          ? relatorios.salas({ ...params, salaIds: f.salaIds, diasFuturo: f.diasFuturo })
+          : Promise.resolve([]),
+        f.computadorIds.length > 0
+          ? relatorios.computadores({ ...params, computadorIds: f.computadorIds, diasFuturo: f.diasFuturo })
+          : Promise.resolve([]),
         relatorios.status({ ...params, salaIds: f.salaIds, computadorIds: f.computadorIds }),
       ]);
       setDadosRecursos({ salas: salasData, computadores: computadoresData, status: statusData });
@@ -101,7 +108,6 @@ export default function EstatisticasPage() {
     } finally { setLoadingRecursos(false); }
   }, []);
 
-  // Carrega automaticamente na semana atual ao abrir
   useEffect(() => {
     if (jaCarregou) return;
     setJaCarregou(true);
@@ -121,6 +127,43 @@ export default function EstatisticasPage() {
     });
   }, [buscarHeatmap, buscarRecursos]);
 
+  const buildSnapshot = useCallback((
+    historico: SnapshotHistorico | null,
+    usuarios: SnapshotUsuarios | null,
+    recursos: DadosRecursos,
+    filtrosAtivos: FiltrosRelatorio,
+  ): ExportSnapshot => ({
+    capturedAt: new Date(),
+    filtrosGlobais: { inicio: filtrosAtivos.inicio, fim: filtrosAtivos.fim },
+    historico,
+    usuarios,
+    recursos: {
+      periodo: { inicio: filtrosAtivos.inicio, fim: filtrosAtivos.fim },
+      salas: recursos.salas,
+      computadores: recursos.computadores,
+      status: recursos.status,
+      diasFuturo: filtrosAtivos.diasFuturo ?? 30,
+    },
+  }), []);
+
+  const handleHistoricoSnapshot = useCallback((s: SnapshotHistorico) => {
+    snapshotHistoricoRef.current = s;
+    setExportSnapshot(prev => buildSnapshot(s, snapshotUsuariosRef.current, dadosRecursos, filtros));
+  }, [buildSnapshot, dadosRecursos, filtros]);
+
+  const handleUsuariosSnapshot = useCallback((s: SnapshotUsuarios) => {
+    snapshotUsuariosRef.current = s;
+    setExportSnapshot(prev => buildSnapshot(snapshotHistoricoRef.current, s, dadosRecursos, filtros));
+  }, [buildSnapshot, dadosRecursos, filtros]);
+
+  // Atualiza snapshot de recursos sempre que dadosRecursos muda
+  useEffect(() => {
+    setExportSnapshot(prev => {
+      if (!prev && !snapshotHistoricoRef.current && !snapshotUsuariosRef.current) return prev;
+      return buildSnapshot(snapshotHistoricoRef.current, snapshotUsuariosRef.current, dadosRecursos, filtros);
+    });
+  }, [dadosRecursos, buildSnapshot, filtros]);
+
   const handleAplicarGlobal = (periodo: PeriodoFiltro) => {
     const novos: FiltrosRelatorio = { ...filtros, ...periodo };
     setFiltros(novos);
@@ -131,7 +174,6 @@ export default function EstatisticasPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header com abas + filtro global inline */}
       <div className="border-b border-[var(--border)] -mx-4 lg:-mx-8 px-4 lg:px-8">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div className="flex items-end gap-8">
@@ -160,8 +202,6 @@ export default function EstatisticasPage() {
               ))}
             </div>
           </div>
-
-          {/* Filtro global — canto direito do header */}
           <div className="flex items-center gap-2 pb-3">
             <span className="text-xs text-[var(--text-muted)] font-medium">Para todos:</span>
             <FiltroPeriodoInline
@@ -174,7 +214,6 @@ export default function EstatisticasPage() {
         </div>
       </div>
 
-
       <div style={{ display: aba === 'historico' ? undefined : 'none' }}>
         <AbaHistorico
           filtros={filtros}
@@ -184,6 +223,7 @@ export default function EstatisticasPage() {
           onBuscarHeatmap={buscarHeatmap}
           modoHeatmap={modoHeatmap}
           onModoHeatmap={setModoHeatmap}
+          onSnapshot={handleHistoricoSnapshot}
         />
       </div>
       <div style={{ display: aba === 'recursos' ? undefined : 'none' }}>
@@ -199,10 +239,10 @@ export default function EstatisticasPage() {
         />
       </div>
       <div style={{ display: aba === 'usuarios' ? undefined : 'none' }}>
-        <AbaUsuarios filtros={filtros} globalVersao={globalVersao} />
+        <AbaUsuarios filtros={filtros} globalVersao={globalVersao} onSnapshot={handleUsuariosSnapshot} />
       </div>
       <div style={{ display: aba === 'download' ? undefined : 'none' }}>
-        <AbaDownload dados={dadosRecursos} filtros={filtros} />
+        <AbaDownload dados={dadosRecursos} filtros={filtros} exportSnapshot={exportSnapshot} salasDisponiveis={salasDisponiveis} computadoresDisponiveis={computadoresDisponiveis} />
       </div>
     </div>
   );

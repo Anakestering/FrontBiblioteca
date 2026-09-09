@@ -10,6 +10,7 @@ import { toISOLocal } from '@/lib/utils';
 interface Props {
   filtros: FiltrosRelatorio;
   globalVersao: number;
+  onDadosChange?: (dados: EstatisticasOcupacaoDiaDTO[]) => void;
 }
 
 interface Tooltip {
@@ -29,7 +30,7 @@ function getCorBarra(taxa: number, isMax: boolean): string {
   return '#3b0764';
 }
 
-export function OcupacaoSemanaCard({ filtros, globalVersao }: Props) {
+export function OcupacaoSemanaCard({ filtros, globalVersao, onDadosChange }: Props) {
   const [dados, setDados]              = useState<EstatisticasOcupacaoDiaDTO[]>([]);
   const [loading, setLoading]          = useState(false);
   const [periodoLocal, setPeriodoLocal] = useState<PeriodoFiltro>({ inicio: filtros.inicio, fim: filtros.fim });
@@ -46,6 +47,7 @@ export function OcupacaoSemanaCard({ filtros, globalVersao }: Props) {
         fim:    periodo.fim    ? toISOLocal(periodo.fim, true) : undefined,
       });
       setDados(data);
+      onDadosChange?.(data);
     } catch (err) {
       console.error(err);
     } finally {

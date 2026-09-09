@@ -1,12 +1,7 @@
 'use client';
 
-export function formatarNumero(n: number): string {
-  if (n >= 1000) {
-    const k = n / 1000;
-    return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}k`;
-  }
-  return n.toLocaleString('pt-BR');
-}
+// Re-exporta para compatibilidade com imports existentes
+export { formatarNumero } from '@/lib/utils';
 
 export interface CardInfo {
   label: string;
@@ -33,7 +28,7 @@ export function ResumoAbas({ cards, loading }: Props) {
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {cards.map((card, i) => (
         <div key={i} className="card p-4 flex flex-col gap-1 min-w-0">
-          <span className={`text-[10px] font-semibold uppercase tracking-widest ${cores[card.cor]}`}>
+          <span className={`text-[12px] font-semibold uppercase tracking-widest ${cores[card.cor]}`}>
             {card.label}
           </span>
           {loading ? (
@@ -44,7 +39,7 @@ export function ResumoAbas({ cards, loading }: Props) {
             </span>
           )}
           {card.sub && !loading && (
-            <span className="text-xs text-[var(--text-muted)]">{card.sub}</span>
+            <span className="text-[14px] text-[var(--text-muted)]">{card.sub}</span>
           )}
         </div>
       ))}

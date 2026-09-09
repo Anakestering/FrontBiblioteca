@@ -65,6 +65,7 @@ export function FiltroPeriodoInline({ valor, loading, onChange, comBotaoAplicar 
         <option value="semana">Esta semana</option>
         <option value="mes">Este mês</option>
         <option value="ano">Este ano</option>
+        <option value="inicio">Desde o início</option>
         <option value="personalizado">Personalizado</option>
       </select>
 

@@ -22,6 +22,7 @@ interface Props {
 export function AbaRecursos({ filtros, globalVersao, dados, loading, erro, onBuscarRecursos, salasDisponiveis, computadoresDisponiveis }: Props) {
   const [salaIds, setSalaIds]             = useState<number[]>(filtros.salaIds);
   const [computadorIds, setComputadorIds] = useState<number[]>(filtros.computadorIds);
+  const [diasFuturo, setDiasFuturo]       = useState<number>(30);
 
   useEffect(() => {
     if (globalVersao === 0) return;
@@ -30,13 +31,12 @@ export function AbaRecursos({ filtros, globalVersao, dados, loading, erro, onBus
   }, [globalVersao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAplicar = (f: FiltrosRelatorio) => {
-    onBuscarRecursos({ ...f, salaIds, computadorIds });
+    onBuscarRecursos({ ...f, salaIds, computadorIds, diasFuturo });
   };
 
   return (
     <div className="space-y-6">
-
-      <ResumoCardsRecursos dados={dados} loading={loading} />
+      <ResumoCardsRecursos dados={dados} loading={loading} diasFuturo={diasFuturo} />
 
       <FiltrosBarras
         filtros={filtros}
@@ -47,8 +47,10 @@ export function AbaRecursos({ filtros, globalVersao, dados, loading, erro, onBus
         <FiltrosRecursos
           salaIds={salaIds}
           computadorIds={computadorIds}
+          diasFuturo={diasFuturo}
           onChangeSalas={setSalaIds}
           onChangePcs={setComputadorIds}
+          onChangeDiasFuturo={setDiasFuturo}
           salasDisponiveis={salasDisponiveis}
           computadoresDisponiveis={computadoresDisponiveis}
         />
@@ -65,9 +67,8 @@ export function AbaRecursos({ filtros, globalVersao, dados, loading, erro, onBus
       )}
 
       {!loading && (
-        <RecursosCard dados={dados} />
+        <RecursosCard dados={dados} diasFuturo={diasFuturo} />
       )}
-
     </div>
   );
 }

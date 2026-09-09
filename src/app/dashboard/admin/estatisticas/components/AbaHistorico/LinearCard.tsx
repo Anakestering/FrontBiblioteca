@@ -17,6 +17,11 @@ import { FiltrosRelatorio } from '../../page';
 import { FiltroPeriodoInline, PeriodoFiltro } from '../FiltroPeriodoInline';
 import { toISOLocal } from '@/lib/utils';
 import { relatorios } from '@/lib/api';
+import {
+  EstatisticasPontoHistoricoDTO as PontoHistorico,
+  EstatisticasPontoAbandono    as PontoAbandono,
+  EstatisticasTendencia        as TendenciaDTO,
+} from '@/types';
 
 interface Props {
   filtros: FiltrosRelatorio;
@@ -29,24 +34,6 @@ interface Props {
     tendenciaAbandono: TendenciaDTO | null;
     taxaAbandono: number;
   }) => void;
-}
-
-interface PontoHistorico {
-  data: string;
-  total: number;           // pedidos finalizados (linha do gráfico)
-  mm?: number;
-  totalReservas?: number;  // recursos individuais utilizados (tooltip)
-}
-
-interface PontoAbandono {
-  data: string;
-  total: number;
-  mm?: number;
-}
-
-interface TendenciaDTO {
-  pct: number;
-  subindo: boolean;
 }
 
 type Agrupamento = 'dia' | 'semana' | 'mes';
@@ -125,7 +112,7 @@ function Tooltip({ state, visReservas, visAbandono, visTendencia, visTendenciaAb
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c3aed', flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: '#e5e7eb' }}>
                 <strong style={{ color: '#fff' }}>{state.total}</strong>
-                <span style={{ color: '#9ca3af', marginLeft: 4 }}>pedidos finalizados</span>
+                <span style={{ color: '#9ca3af', marginLeft: 4 }}>reservas finalizadas</span>
               </span>
             </div>
           )}
@@ -133,7 +120,7 @@ function Tooltip({ state, visReservas, visAbandono, visTendencia, visTendenciaAb
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 14 }}>
               <span style={{ fontSize: 12, color: '#e5e7eb' }}>
                 <strong style={{ color: '#c4b5fd' }}>{state.totalReservas}</strong>
-                <span style={{ color: '#9ca3af', marginLeft: 4 }}>reservas finalizadas</span>
+                <span style={{ color: '#9ca3af', marginLeft: 4 }}>pedidos</span>
               </span>
             </div>
           )}
@@ -184,7 +171,7 @@ function ToggleLinha({ ativo, onChange, cor, dashed, label, disabled }: TogglePr
     <button
       onClick={() => !disabled && onChange(!ativo)}
       disabled={disabled}
-      className={`flex items-center gap-1.5 text-xs transition-all rounded px-1.5 py-1 ${
+      className={`flex items-center gap-1.5 text-[14px] transition-all rounded px-1.5 py-1 ${
         disabled
           ? 'opacity-30 cursor-not-allowed'
           : ativo
@@ -254,14 +241,8 @@ export function LinearCard({ filtros, globalVersao, onDadosChange }: Props) {
         setTendenciaAbandono(null);
         onDadosChange?.({ pontos: resposta, tendencia: null, mediaPessoasDia: 0, abandonos: [], tendenciaAbandono: null, taxaAbandono: 0 });
       } else {
-        const r = resposta as {
-          pontos: PontoHistorico[];
-          abandonos: PontoAbandono[];
-          tendencia: TendenciaDTO | null;
-          tendenciaAbandono: TendenciaDTO | null;
-          mediaPessoasDia: number;
-          taxaAbandono: number;
-        };
+        // resposta já é EstatisticasHistoricoDTO — sem cast necessário
+        const r = resposta;
         setDados(r.pontos ?? []);
         setAbandonos(r.abandonos ?? []);
         setTendencia(r.tendencia ?? null);
@@ -493,7 +474,7 @@ export function LinearCard({ filtros, globalVersao, onDadosChange }: Props) {
                 className={`text-xs px-3 py-1.5 rounded-md font-medium transition-all ${
                   agrupamento === a
                     ? 'bg-violet-600 text-white shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                    : 'text-[var(--text-muted)] text-[13px] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {a === 'dia' ? 'Dia' : a === 'semana' ? 'Semana' : 'Mês'}
@@ -531,14 +512,14 @@ export function LinearCard({ filtros, globalVersao, onDadosChange }: Props) {
             ativo={visReservas}
             onChange={setVisReservas}
             cor="#7c3aed"
-            label="Pedidos"
+            label="Reservas"
           />
           <ToggleLinha
             ativo={visTendencia}
             onChange={setVisTendencia}
             cor="#a78bfa"
             dashed
-            label={`Tendência pedido`}
+            label="Tendência reservas"
           />
           <ToggleLinha
             ativo={visAbandono}

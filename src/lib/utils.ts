@@ -23,6 +23,7 @@ export const statusReservaLabel: Record<StatusReserva, string> = {
   PENDENTE_APROVACAO: 'Aguardando Aprovação',
   APROVADA: 'Aprovada',
   CANCELADA: 'Cancelada',
+  LIBERADA_ANTECIPADA: 'Liberada Antecipadamente',
   ATRASADO: 'Atrasado',
   EM_ANDAMENTO: 'Em Andamento',
   FINALIZADA: 'Finalizada',
@@ -33,6 +34,7 @@ export const statusReservaColor: Record<StatusReserva, string> = {
   PENDENTE_APROVACAO: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   APROVADA: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   CANCELADA: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  LIBERADA_ANTECIPADA: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
   ATRASADO: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
   EM_ANDAMENTO: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
   FINALIZADA: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
@@ -130,7 +132,7 @@ export interface PeriodoFiltro {
   fim: Date | null;
 }
 
-export type PeriodoPreset = 'semana' | 'mes' | 'ano' | 'personalizado';
+export type PeriodoPreset = 'semana' | 'mes' | 'ano' | 'inicio' | 'personalizado';
 
 export function calcularDatas(periodo: PeriodoPreset): PeriodoFiltro {
   const hoje = new Date();
@@ -142,10 +144,12 @@ export function calcularDatas(periodo: PeriodoPreset): PeriodoFiltro {
   }
   if (periodo === 'mes') return { inicio: new Date(hoje.getFullYear(), hoje.getMonth(), 1), fim: hoje };
   if (periodo === 'ano') return { inicio: new Date(hoje.getFullYear(), 0, 1), fim: hoje };
+  if (periodo === 'inicio') return { inicio: null, fim: null };
   return { inicio: null, fim: null };
 }
 
 export function detectarPeriodo(valor: PeriodoFiltro): PeriodoPreset {
+  if (!valor.inicio && !valor.fim) return 'inicio';
   if (!valor.inicio || !valor.fim) return 'personalizado';
   const fmt = (d: Date) => d.toDateString();
   if (fmt(valor.inicio) === fmt(calcularDatas('semana').inicio!)) return 'semana';
@@ -201,4 +205,44 @@ export function saoConsecutivos(blocos: Date[]): boolean {
   if (blocos.length <= 1) return true;
   const grupos = agruparConsecutivos(blocos);
   return grupos.length === 1;
+}
+// ─── Formatação de números e tempo ────────────────────────────────────────────
+
+/**
+ * Formata minutos em horas e minutos legíveis.
+ * Ex: 90 → "1h 30min" | 60 → "1h" | 45 → "45min"
+ */
+export function minutosParaHoras(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${m}min`;
+  if (h >= 1000) {
+    const k = h / 1000;
+    return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}k h`;
+  }
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}min`;
+}
+
+/**
+ * Formata minutos em horas arredondadas para cards de resumo.
+ * Ex: 90 → "2h" | 45 → "45min" | 90000 → "1.5k h"
+ */
+export function formatarHoras(minutos: number): string {
+  const horas = minutos / 60;
+  if (horas >= 1000) return `${(horas / 1000).toFixed(1)}k h`;
+  if (horas < 1)    return `${minutos}min`;
+  return `${Math.round(horas)}h`;
+}
+
+/**
+ * Formata um número com sufixo "k" se >= 1000.
+ * Ex: 1500 → "1.5k" | 999 → "999"
+ */
+export function formatarNumero(n: number): string {
+  if (n >= 1000) {
+    const k = n / 1000;
+    return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}k`;
+  }
+  return n.toLocaleString('pt-BR');
 }

@@ -2,6 +2,9 @@
 
 export type NivelAcesso = 'ADMIN' | 'PADRAO';
 
+/** Status da conta do usuário — espelha o enum StatusConta do backend */
+export type StatusConta = 'ATIVO' | 'PENDENTE' | 'INATIVO';
+
 export type TipoUsuario = 'SENAI' | 'SESI' | 'COLABORADOR' | 'RESPONSAVEL' | 'OUTRO';
 
 export interface UsuarioOutroInfo {
@@ -14,6 +17,7 @@ export type StatusReserva =
   | 'PENDENTE_APROVACAO'
   | 'APROVADA'
   | 'CANCELADA'
+  | 'LIBERADA_ANTECIPADA'
   | 'ATRASADO'
   | 'EM_ANDAMENTO'
   | 'FINALIZADA'
@@ -31,6 +35,7 @@ export interface Usuario {
   telefone?: string;
   nivelAcesso: NivelAcesso;
   ativo: boolean;
+  statusConta: StatusConta;
   createdAt: string;
   updatedAt: string;
   tipoUsuario?: TipoUsuario;
@@ -200,7 +205,8 @@ export interface EstatisticasRecursoDTO {
   nome: string;
   totalMinutosUsados: number;
   totalReservasFinalizadas: number;
-  minutosDisponiveis: number; // calculado pelo backend: diasUteis * 900min
+  minutosDisponiveis: number;        // diasUteis * 900min
+  minutosReservadosFuturos: number;  // reservas APROVADA/PENDENTE futuras
 }
 
 export interface EstatisticasStatusReservasDTO {
@@ -242,13 +248,18 @@ export interface EstatisticasOcupacaoDiaDTO {
   taxaOcupacao: number;
 }
 
-export interface EstatisticasHistoricoDTO {
-  pontos: EstatisticasPontoHistoricoDTO[];
-  tendencia: { pct: number; subindo: boolean } | null;
-  mediaPessoasDia: number;
+/** Tendencia calculada no backend: pct = percentual de variacao, subindo = direcao */
+export interface EstatisticasTendencia {
+  pct: number;
+  subindo: boolean;
 }
 
-// ─── Estatísticas de Usuários ─────────────────────────────────────────────────
+/** Ponto de serie de abandonos (pedidos com status ATRASADO) no grafico linear */
+export interface EstatisticasPontoAbandono {
+  data: string;
+  total: number;
+  mm?: number;
+}
 
 export interface DistribuicaoTipoDTO {
   tipo: string;
@@ -265,6 +276,7 @@ export interface RankingUsuarioDTO {
   id: number;
   nome: string;
   tipoUsuario: string | null;
+  cpf: string | null;
   pedidosFinalizados: number;
   pedidosCancelados: number;
   pedidosAbandono: number;
@@ -284,4 +296,17 @@ export interface EstatisticasUsuariosDTO {
   crescimento: CrescimentoMesDTO[];
   totalAtivos: number;
   totalCadastrados: number;
+  totalPorTipo: Record<string, number>;
+  novosPorTipo: Record<string, number>;
+  ativosPorTipo: Record<string, number>;
+}
+
+/** Resposta completa do endpoint GET /estatisticas/historico */
+export interface EstatisticasHistoricoDTO {
+  pontos: EstatisticasPontoHistoricoDTO[];
+  abandonos: EstatisticasPontoAbandono[];
+  tendencia: EstatisticasTendencia | null;
+  tendenciaAbandono: EstatisticasTendencia | null;
+  mediaPessoasDia: number;
+  taxaAbandono: number;
 }

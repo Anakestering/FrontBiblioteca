@@ -1,25 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FiltrosRelatorio } from '../../page';
-import { EstatisticasHeatmapDTO } from '@/types';
+import { EstatisticasHeatmapDTO, EstatisticasOcupacaoDiaDTO } from '@/types';
 import { PeriodoFiltro } from '@/lib/utils';
 import { HeatmapCard } from './HeatmapCard';
 import { LinearCard } from './LinearCard';
 import { ResumoCardsHistorico } from './ResumoCards';
 import { OcupacaoSemanaCard } from './OcupacaoSemanaCard';
+import type { SnapshotHistorico } from '../AbaRelatorio/utils/types';
 
 const DIAS = ['', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
-
-interface Props {
-  filtros: FiltrosRelatorio;
-  globalVersao: number;
-  heatmap: EstatisticasHeatmapDTO[];
-  loadingHeatmap: boolean;
-  onBuscarHeatmap: (f: FiltrosRelatorio) => void;
-  modoHeatmap: 'media' | 'total';
-  onModoHeatmap: (modo: 'media' | 'total') => void;
-}
 
 export interface DadosLinear {
   pontos: { data: string; total: number; mm?: number; totalReservas?: number }[];
@@ -30,6 +21,17 @@ export interface DadosLinear {
   taxaAbandono: number;
 }
 
+interface Props {
+  filtros: FiltrosRelatorio;
+  globalVersao: number;
+  heatmap: EstatisticasHeatmapDTO[];
+  loadingHeatmap: boolean;
+  onBuscarHeatmap: (f: FiltrosRelatorio) => void;
+  modoHeatmap: 'media' | 'total';
+  onModoHeatmap: (modo: 'media' | 'total') => void;
+  onSnapshot?: (s: SnapshotHistorico) => void;
+}
+
 export function AbaHistorico({
   filtros,
   globalVersao,
@@ -38,6 +40,7 @@ export function AbaHistorico({
   onBuscarHeatmap,
   modoHeatmap,
   onModoHeatmap,
+  onSnapshot,
 }: Props) {
   const [periodoHeatmap, setPeriodoHeatmap] = useState<PeriodoFiltro>({
     inicio: filtros.inicio,
@@ -45,6 +48,11 @@ export function AbaHistorico({
   });
   const [dadosLinear, setDadosLinear] = useState<DadosLinear | null>(null);
   const [loadingLinear, setLoadingLinear] = useState(true);
+  const [ocupacaoDia, setOcupacaoDia] = useState<EstatisticasOcupacaoDiaDTO[]>([]);
+
+  // Ref para evitar closure stale no callback de snapshot
+  const snapshotRef = useRef(onSnapshot);
+  useEffect(() => { snapshotRef.current = onSnapshot; }, [onSnapshot]);
 
   useEffect(() => {
     setPeriodoHeatmap({ inicio: filtros.inicio, fim: filtros.fim });
@@ -61,21 +69,30 @@ export function AbaHistorico({
     return `${DIAS[pico.diaSemana]} ${pico.hora}h`;
   }, [heatmap]);
 
+  // Emite snapshot sempre que dados relevantes mudam
+  useEffect(() => {
+    if (loadingLinear) return;
+    snapshotRef.current?.({
+      periodo: { inicio: filtros.inicio, fim: filtros.fim },
+      dadosLinear,
+      heatmap,
+      picoHorario,
+      ocupacaoDia,
+    });
+  }, [dadosLinear, heatmap, picoHorario, ocupacaoDia, loadingLinear, filtros.inicio, filtros.fim]);
+
   return (
     <div className="space-y-6">
-
       <ResumoCardsHistorico
         dados={dadosLinear}
         picoHorario={picoHorario}
         loading={loadingLinear || loadingHeatmap}
       />
-
       <LinearCard
         filtros={filtros}
         globalVersao={globalVersao}
         onDadosChange={(d) => { setDadosLinear(d); setLoadingLinear(false); }}
       />
-
       <div className="flex gap-6 items-start">
         <HeatmapCard
           heatmap={heatmap}
@@ -90,6 +107,7 @@ export function AbaHistorico({
           <OcupacaoSemanaCard
             filtros={filtros}
             globalVersao={globalVersao}
+            onDadosChange={setOcupacaoDia}
           />
         </div>
       </div>
